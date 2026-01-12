@@ -27,7 +27,7 @@ func (s *Service) GetBranches() ([]types.Branch, error) {
 	if err != nil {
 		return nil, err
 	}
-	headHash := head.Hash().String()
+	headBranch := head.Name().String()
 
 	// Get local branches
 	branchIter, err := s.repo.Branches()
@@ -40,7 +40,7 @@ func (s *Service) GetBranches() ([]types.Branch, error) {
 			FullName: ref.Name().String(),
 			Hash:     ref.Hash().String(),
 			IsRemote: false,
-			IsHead:   ref.Hash().String() == headHash,
+			IsHead:   ref.Name().String() == headBranch,
 		}
 		branches = append(branches, branch)
 		return nil

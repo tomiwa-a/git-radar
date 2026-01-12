@@ -18,6 +18,7 @@ type Screen int
 const (
 	DashboardScreen Screen = iota
 	FileListScreen
+	DiffViewScreen
 )
 
 type Model struct {
@@ -151,6 +152,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateDashboard(msg)
 		case FileListScreen:
 			return m.updateFileList(msg)
+		case DiffViewScreen:
+			return m.updateDiffs(msg)
 		}
 	}
 	return m, nil
@@ -210,6 +213,35 @@ func (m Model) updateFileList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.Screen = DashboardScreen
 		m.SelectedCommit = types.Commit{}
+		m.FileIdx = 0
+
+	case "up", "k":
+		if m.FileIdx > 0 {
+			m.FileIdx--
+		}
+
+	case "down", "j":
+		if m.FileIdx < len(m.SelectedCommit.Files)-1 {
+			m.FileIdx++
+		}
+	case "enter":
+		if len(m.SelectedCommit.Files) > 0 {
+			m.Screen = DiffViewScreen
+		}
+
+	}
+
+	return m, nil
+}
+
+func (m Model) updateDiffs(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q":
+		return m, tea.Quit
+
+	case "esc":
+		m.Screen = FileListScreen
+		// m.SelectedCommit = types.Commit{}
 		m.FileIdx = 0
 
 	case "up", "k":

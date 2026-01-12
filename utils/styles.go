@@ -61,6 +61,12 @@ var (
 	DetailsLabelStyle = lipgloss.NewStyle().
 				Foreground(DimColor)
 
+	FileNameStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#1E1E1E")).
+			Background(lipgloss.Color("#87CEFA")).
+			Padding(0, 1).Margin(0, 2)
+
 	DetailsValueStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#D0D0D0"))
 

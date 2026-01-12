@@ -24,43 +24,51 @@ const (
 )
 
 type Model struct {
-	Incoming       []types.Commit
-	Outgoing       []types.Commit
-	ActivePane     Pane
-	IncomingIdx    int
-	OutgoingIdx    int
-	Width          int
-	Height         int
-	TargetBranch   string
-	SourceBranch   string
-	Screen         Screen
-	SelectedCommit types.Commit
-	FileIdx        int
-	Viewport       viewport.Model
-	ViewportReady  bool
-	GraphCommits   []types.GraphCommit
-	GraphIdx       int
-	CurrentBranch  string
-	Branches       []string
+	Incoming         []types.Commit
+	Outgoing         []types.Commit
+	ActivePane       Pane
+	IncomingIdx      int
+	OutgoingIdx      int
+	Width            int
+	Height           int
+	TargetBranch     string
+	SourceBranch     string
+	Screen           Screen
+	SelectedCommit   types.Commit
+	FileIdx          int
+	Viewport         viewport.Model
+	ViewportReady    bool
+	GraphCommits     []types.GraphCommit
+	GraphIdx         int
+	CurrentBranch    string
+	Branches         []string
+	ShowBranchModal  bool
+	BranchModalIdx   int
+	ShowCompareModal bool
+	CompareModalIdx  int
 }
 
 func InitialModel() Model {
 	return Model{
-		GraphCommits:  DummyGraphCommits,
-		Branches:      DummyBranches,
-		CurrentBranch: "feature/user-validation",
-		GraphIdx:      0,
-		Incoming:      DummyIncoming,
-		Outgoing:      DummyOutgoing,
-		ActivePane:    IncomingPane,
-		IncomingIdx:   0,
-		OutgoingIdx:   0,
-		Width:         80,
-		Height:        24,
-		TargetBranch:  "main",
-		SourceBranch:  "feature/user-validation",
-		Screen:        GraphScreen,
-		FileIdx:       0,
+		GraphCommits:     DummyGraphCommits,
+		Branches:         DummyBranches,
+		CurrentBranch:    "main",
+		GraphIdx:         0,
+		Incoming:         DummyIncoming,
+		Outgoing:         DummyOutgoing,
+		ActivePane:       IncomingPane,
+		IncomingIdx:      0,
+		OutgoingIdx:      0,
+		Width:            80,
+		Height:           24,
+		TargetBranch:     "",
+		SourceBranch:     "",
+		Screen:           GraphScreen,
+		FileIdx:          0,
+		ShowBranchModal:  false,
+		BranchModalIdx:   0,
+		ShowCompareModal: false,
+		CompareModalIdx:  0,
 	}
 }
 
@@ -78,6 +86,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
+		}
+
+		if m.ShowBranchModal {
+			return m.updateBranchModal(msg)
+		}
+
+		if m.ShowCompareModal {
+			return m.updateCompareModal(msg)
+		}
+
+		if msg.String() == "b" {
+			m.ShowBranchModal = true
+			m.BranchModalIdx = 0
+			for i, branch := range m.Branches {
+				if branch == m.CurrentBranch {
+					m.BranchModalIdx = i
+					break
+				}
+			}
+			return m, nil
 		}
 
 		switch m.Screen {
@@ -120,9 +148,20 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "c":
-		m.Screen = DivergenceScreen
+		m.ShowCompareModal = true
+		m.CompareModalIdx = 0
 	}
 	return m, nil
+}
+
+func (m Model) getComparableBranches() []string {
+	var branches []string
+	for _, branch := range m.Branches {
+		if branch != m.CurrentBranch {
+			branches = append(branches, branch)
+		}
+	}
+	return branches
 }
 
 func (m Model) findCommitByHash(hash string) types.Commit {
@@ -260,4 +299,56 @@ func (m Model) initViewport() Model {
 	m.ViewportReady = true
 
 	return m
+}
+
+func (m Model) updateBranchModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "b":
+		m.ShowBranchModal = false
+
+	case "up", "k":
+		if m.BranchModalIdx > 0 {
+			m.BranchModalIdx--
+		}
+
+	case "down", "j":
+		if m.BranchModalIdx < len(m.Branches)-1 {
+			m.BranchModalIdx++
+		}
+
+	case "enter":
+		if len(m.Branches) > 0 {
+			m.CurrentBranch = m.Branches[m.BranchModalIdx]
+			m.ShowBranchModal = false
+		}
+	}
+	return m, nil
+}
+
+func (m Model) updateCompareModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	comparableBranches := m.getComparableBranches()
+
+	switch msg.String() {
+	case "esc", "c":
+		m.ShowCompareModal = false
+
+	case "up", "k":
+		if m.CompareModalIdx > 0 {
+			m.CompareModalIdx--
+		}
+
+	case "down", "j":
+		if m.CompareModalIdx < len(comparableBranches)-1 {
+			m.CompareModalIdx++
+		}
+
+	case "enter":
+		if len(comparableBranches) > 0 {
+			m.TargetBranch = comparableBranches[m.CompareModalIdx]
+			m.SourceBranch = m.CurrentBranch
+			m.ShowCompareModal = false
+			m.Screen = DivergenceScreen
+		}
+	}
+	return m, nil
 }

@@ -14,7 +14,7 @@ func RenderGraph(width int, commits []types.GraphCommit, selectedIdx int, curren
 	title := utils.TitleStyle.Render("Git-Radar")
 	branchLabel := utils.DetailsLabelStyle.Render("branch: ")
 	branchName := utils.BranchStyle.Render(currentBranch)
-	hints := utils.DetailsLabelStyle.Render("c: compare  q: quit")
+	hints := utils.DetailsLabelStyle.Render("b: branches  c: compare  q: quit")
 
 	headerGap := width - lipgloss.Width(title) - lipgloss.Width(branchLabel) - lipgloss.Width(branchName) - lipgloss.Width(hints)
 	if headerGap < 0 {
@@ -66,7 +66,7 @@ func RenderGraph(width int, commits []types.GraphCommit, selectedIdx int, curren
 	}
 
 	b.WriteString("\n")
-	footer := utils.DetailsLabelStyle.Render("↑/↓: navigate │ enter: view commit │ c: compare branches │ q: quit")
+	footer := utils.DetailsLabelStyle.Render("↑/↓: navigate │ enter: view commit │ b: branches │ c: compare │ q: quit")
 	b.WriteString(footer)
 
 	return b.String()

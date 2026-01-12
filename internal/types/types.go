@@ -10,6 +10,8 @@ type Commit struct {
 }
 
 type FileChange struct {
-	Status string
-	Path   string
+	Status    string
+	Path      string
+	Additions int
+	Deletions int
 }

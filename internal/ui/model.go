@@ -13,16 +13,26 @@ const (
 	OutgoingPane
 )
 
+type Screen int
+
+const (
+	DashboardScreen Screen = iota
+	FileListScreen
+)
+
 type Model struct {
-	Incoming     []types.Commit
-	Outgoing     []types.Commit
-	ActivePane   Pane
-	IncomingIdx  int
-	OutgoingIdx  int
-	Width        int
-	Height       int
-	TargetBranch string
-	SourceBranch string
+	Incoming       []types.Commit
+	Outgoing       []types.Commit
+	ActivePane     Pane
+	IncomingIdx    int
+	OutgoingIdx    int
+	Width          int
+	Height         int
+	TargetBranch   string
+	SourceBranch   string
+	Screen         Screen
+	SelectedCommit types.Commit
+	FileIdx        int
 }
 
 func InitialModel() Model {
@@ -35,8 +45,8 @@ func InitialModel() Model {
 				Email:   "alice@example.com",
 				Date:    "2026-01-10 09:15",
 				Files: []types.FileChange{
-					{Status: "M", Path: "src/payments/processor.go"},
-					{Status: "M", Path: "src/payments/validator.go"},
+					{Status: "M", Path: "src/payments/processor.go", Additions: 23, Deletions: 8},
+					{Status: "M", Path: "src/payments/validator.go", Additions: 15, Deletions: 3},
 				},
 			},
 			{
@@ -46,7 +56,7 @@ func InitialModel() Model {
 				Email:   "bob@example.com",
 				Date:    "2026-01-09 16:42",
 				Files: []types.FileChange{
-					{Status: "M", Path: "README.md"},
+					{Status: "M", Path: "README.md", Additions: 45, Deletions: 12},
 				},
 			},
 			{
@@ -56,8 +66,8 @@ func InitialModel() Model {
 				Email:   "alice@example.com",
 				Date:    "2026-01-09 11:20",
 				Files: []types.FileChange{
-					{Status: "M", Path: "go.mod"},
-					{Status: "M", Path: "go.sum"},
+					{Status: "M", Path: "go.mod", Additions: 5, Deletions: 5},
+					{Status: "M", Path: "go.sum", Additions: 120, Deletions: 98},
 				},
 			},
 		},
@@ -69,8 +79,8 @@ func InitialModel() Model {
 				Email:   "you@example.com",
 				Date:    "2026-01-11 14:30",
 				Files: []types.FileChange{
-					{Status: "A", Path: "src/validation/rules.go"},
-					{Status: "M", Path: "src/handlers/user.go"},
+					{Status: "A", Path: "src/validation/rules.go", Additions: 87, Deletions: 0},
+					{Status: "M", Path: "src/handlers/user.go", Additions: 34, Deletions: 12},
 				},
 			},
 			{
@@ -80,9 +90,9 @@ func InitialModel() Model {
 				Email:   "you@example.com",
 				Date:    "2026-01-11 11:15",
 				Files: []types.FileChange{
-					{Status: "M", Path: "src/auth/jwt.go"},
-					{Status: "M", Path: "src/auth/middleware.go"},
-					{Status: "D", Path: "src/auth/legacy.go"},
+					{Status: "M", Path: "src/auth/jwt.go", Additions: 56, Deletions: 23},
+					{Status: "M", Path: "src/auth/middleware.go", Additions: 28, Deletions: 15},
+					{Status: "D", Path: "src/auth/legacy.go", Additions: 0, Deletions: 145},
 				},
 			},
 			{
@@ -92,9 +102,9 @@ func InitialModel() Model {
 				Email:   "you@example.com",
 				Date:    "2026-01-10 17:45",
 				Files: []types.FileChange{
-					{Status: "A", Path: "src/middleware/rate_limit.go"},
-					{Status: "A", Path: "src/config/limits.yaml"},
-					{Status: "M", Path: "src/server.go"},
+					{Status: "A", Path: "src/middleware/rate_limit.go", Additions: 142, Deletions: 0},
+					{Status: "A", Path: "src/config/limits.yaml", Additions: 28, Deletions: 0},
+					{Status: "M", Path: "src/server.go", Additions: 12, Deletions: 3},
 				},
 			},
 			{
@@ -104,7 +114,7 @@ func InitialModel() Model {
 				Email:   "you@example.com",
 				Date:    "2026-01-10 10:22",
 				Files: []types.FileChange{
-					{Status: "M", Path: "src/config/loader.go"},
+					{Status: "M", Path: "src/config/loader.go", Additions: 1, Deletions: 1},
 				},
 			},
 		},
@@ -115,6 +125,8 @@ func InitialModel() Model {
 		Height:       24,
 		TargetBranch: "main",
 		SourceBranch: "feature/user-validation",
+		Screen:       DashboardScreen,
+		FileIdx:      0,
 	}
 }
 
@@ -130,36 +142,84 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q":
+		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
+		}
 
-		case "left", "h":
-			m.ActivePane = IncomingPane
+		switch m.Screen {
+		case DashboardScreen:
+			return m.updateDashboard(msg)
+		case FileListScreen:
+			return m.updateFileList(msg)
+		}
+	}
+	return m, nil
+}
 
-		case "right", "l":
+func (m Model) updateDashboard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q":
+		return m, tea.Quit
+
+	case "left", "h":
+		m.ActivePane = IncomingPane
+
+	case "right", "l":
+		m.ActivePane = OutgoingPane
+
+	case "up", "k":
+		if m.ActivePane == IncomingPane && m.IncomingIdx > 0 {
+			m.IncomingIdx--
+		} else if m.ActivePane == OutgoingPane && m.OutgoingIdx > 0 {
+			m.OutgoingIdx--
+		}
+
+	case "down", "j":
+		if m.ActivePane == IncomingPane && m.IncomingIdx < len(m.Incoming)-1 {
+			m.IncomingIdx++
+		} else if m.ActivePane == OutgoingPane && m.OutgoingIdx < len(m.Outgoing)-1 {
+			m.OutgoingIdx++
+		}
+
+	case "tab":
+		if m.ActivePane == IncomingPane {
 			m.ActivePane = OutgoingPane
+		} else {
+			m.ActivePane = IncomingPane
+		}
 
-		case "up", "k":
-			if m.ActivePane == IncomingPane && m.IncomingIdx > 0 {
-				m.IncomingIdx--
-			} else if m.ActivePane == OutgoingPane && m.OutgoingIdx > 0 {
-				m.OutgoingIdx--
-			}
+	case "enter":
+		if m.ActivePane == IncomingPane && len(m.Incoming) > 0 {
+			m.SelectedCommit = m.Incoming[m.IncomingIdx]
+		} else if m.ActivePane == OutgoingPane && len(m.Outgoing) > 0 {
+			m.SelectedCommit = m.Outgoing[m.OutgoingIdx]
+		}
+		if m.SelectedCommit.Hash != "" {
+			m.Screen = FileListScreen
+			m.FileIdx = 0
+		}
+	}
+	return m, nil
+}
 
-		case "down", "j":
-			if m.ActivePane == IncomingPane && m.IncomingIdx < len(m.Incoming)-1 {
-				m.IncomingIdx++
-			} else if m.ActivePane == OutgoingPane && m.OutgoingIdx < len(m.Outgoing)-1 {
-				m.OutgoingIdx++
-			}
+func (m Model) updateFileList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q":
+		return m, tea.Quit
 
-		case "tab":
-			if m.ActivePane == IncomingPane {
-				m.ActivePane = OutgoingPane
-			} else {
-				m.ActivePane = IncomingPane
-			}
+	case "esc":
+		m.Screen = DashboardScreen
+		m.SelectedCommit = types.Commit{}
+		m.FileIdx = 0
+
+	case "up", "k":
+		if m.FileIdx > 0 {
+			m.FileIdx--
+		}
+
+	case "down", "j":
+		if m.FileIdx < len(m.SelectedCommit.Files)-1 {
+			m.FileIdx++
 		}
 	}
 	return m, nil

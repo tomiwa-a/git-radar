@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing"
+	"github.com/go-git/go-git/v6/plumbing/format/diff"
 	"github.com/go-git/go-git/v6/plumbing/object"
 	"github.com/tomiwa-a/git-radar/internal/types"
 	"github.com/tomiwa-a/git-radar/utils"
@@ -160,30 +161,50 @@ func (s *Service) GetCommits(branch string, limit int) ([]types.GraphCommit, err
 		// Format message (first line only)
 		message := strings.Split(strings.TrimSpace(c.Message), "\n")[0]
 
-		// Build file change summary for this commit
 		var files []types.FileChange
 		if len(c.ParentHashes) > 0 {
-			// Use first parent to compute patch stats
 			parent, perr := c.Parent(0)
 			if perr == nil {
 				patch, perr := parent.Patch(c)
 				if perr == nil {
-					for _, stat := range patch.Stats() {
-						files = append(files, types.FileChange{
-							Status:    "M",
-							Path:      stat.Name,
-							Additions: stat.Addition,
-							Deletions: stat.Deletion,
-						})
+					for _, fp := range patch.FilePatches() {
+						from, to := fp.Files()
+						name := ""
+						if to != nil {
+							name = to.Path()
+						} else if from != nil {
+							name = from.Path()
+						}
+						adds, dels := 0, 0
+						for _, chunk := range fp.Chunks() {
+							content := chunk.Content()
+							lines := strings.Count(content, "\n")
+							if len(content) > 0 && content[len(content)-1] != '\n' {
+								lines++
+							}
+							switch chunk.Type() {
+							case diff.Add:
+								adds += lines
+							case diff.Delete:
+								dels += lines
+							}
+						}
+						files = append(files, types.FileChange{Status: "M", Path: name, Additions: adds, Deletions: dels})
 					}
 				}
 			}
 		} else {
-			// Root commit: mark files as added
 			tree, terr := c.Tree()
 			if terr == nil {
 				tree.Files().ForEach(func(f *object.File) error {
-					files = append(files, types.FileChange{Status: "A", Path: f.Name})
+					additions := 0
+					if contents, cerr := f.Contents(); cerr == nil {
+						additions = strings.Count(contents, "\n")
+						if len(contents) > 0 && contents[len(contents)-1] != '\n' {
+							additions++
+						}
+					}
+					files = append(files, types.FileChange{Status: "A", Path: f.Name, Additions: additions, Deletions: 0})
 					return nil
 				})
 			}

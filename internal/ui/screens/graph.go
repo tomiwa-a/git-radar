@@ -119,9 +119,6 @@ func RenderGraphWithLegend(width, height int, commits []types.GraphCommit, selec
 func RenderGraphContent(width int, commits []types.GraphCommit, selectedIdx int) string {
 	var b strings.Builder
 
-	// Calculate available width for message
-	// Format: "● abc1234 message...                    19m  ⚑2"
-	// Fixed: dot(2) + hash(8) + space(1) + time(5) + space(1) + branch indicator(4) = ~21
 	msgWidth := width - 25
 	if msgWidth < 20 {
 		msgWidth = 20

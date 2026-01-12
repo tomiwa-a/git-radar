@@ -19,6 +19,7 @@ func main() {
 
 	// Create model with git data
 	model := ui.InitialModel()
+	model.GitService = gitService
 
 	// Load branches
 	branches, err := gitService.GetBranches()
@@ -34,8 +35,8 @@ func main() {
 		model.CurrentBranch = currentBranch
 	}
 
-	// Load commits for graph
-	commits, err := gitService.GetCommits(100)
+	// Load commits for graph (for current branch)
+	commits, err := gitService.GetCommits(currentBranch, 100)
 	if err != nil {
 		fmt.Printf("Warning: could not load commits: %v\n", err)
 	} else {

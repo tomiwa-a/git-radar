@@ -28,10 +28,10 @@ var (
 )
 
 func RenderGraph(width int, commits []types.GraphCommit, selectedIdx int, currentBranch string) string {
-	return RenderGraphWithLegend(width, 24, commits, selectedIdx, currentBranch, false, "")
+	return RenderGraphWithLegend(width, 24, commits, selectedIdx, currentBranch, false, "", false)
 }
 
-func RenderGraphWithLegend(width, height int, commits []types.GraphCommit, selectedIdx int, currentBranch string, showLegend bool, viewportContent string) string {
+func RenderGraphWithLegend(width, height int, commits []types.GraphCommit, selectedIdx int, currentBranch string, showLegend bool, viewportContent string, loading bool) string {
 	if showLegend {
 		return utils.RenderLegend(
 			width, height,
@@ -77,6 +77,9 @@ func RenderGraphWithLegend(width, height int, commits []types.GraphCommit, selec
 
 	// Viewport content on left, details on right
 	leftContent := viewportContent
+	if loading {
+		leftContent = "Loading commits...\n"
+	}
 	rightContent := renderDetailsPanel(rightPaneWidth, selectedCommit, height-6)
 
 	// Split viewport content into lines

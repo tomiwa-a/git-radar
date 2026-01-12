@@ -87,7 +87,7 @@ func (s *Service) GetCurrentBranch() (string, error) {
 	return head.Name().Short(), nil
 }
 
-func (s *Service) GetCommits(limit int) ([]types.GraphCommit, error) {
+func (s *Service) GetCommits(branch string, limit int) ([]types.GraphCommit, error) {
 	// Build hash → branch names map
 	branchMap := make(map[string][]string)
 	branches, _ := s.GetBranches()
@@ -95,8 +95,38 @@ func (s *Service) GetCommits(limit int) ([]types.GraphCommit, error) {
 		branchMap[b.Hash] = append(branchMap[b.Hash], b.Name)
 	}
 
+	// Resolve branch to reference
+	var fromHash plumbing.Hash
+	if branch != "" {
+		ref, err := s.repo.Reference(plumbing.NewBranchReferenceName(branch), true)
+		if err != nil {
+			// Try remote branch
+			ref, err = s.repo.Reference(plumbing.NewRemoteReferenceName("origin", branch), true)
+			if err != nil {
+				// Fall back to HEAD
+				head, headErr := s.repo.Head()
+				if headErr != nil {
+					return nil, headErr
+				}
+				fromHash = head.Hash()
+			} else {
+				fromHash = ref.Hash()
+			}
+		} else {
+			fromHash = ref.Hash()
+		}
+	} else {
+		// Use HEAD if no branch specified
+		head, err := s.repo.Head()
+		if err != nil {
+			return nil, err
+		}
+		fromHash = head.Hash()
+	}
+
 	// Get commit log
 	commitIter, err := s.repo.Log(&git.LogOptions{
+		From:  fromHash,
 		Order: git.LogOrderCommitterTime,
 	})
 	if err != nil {

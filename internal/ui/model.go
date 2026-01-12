@@ -3,6 +3,7 @@ package ui
 import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/tomiwa-a/git-radar/internal/git"
 	"github.com/tomiwa-a/git-radar/internal/types"
 	"github.com/tomiwa-a/git-radar/internal/ui/screens"
 	"github.com/tomiwa-a/git-radar/utils"
@@ -23,6 +24,10 @@ const (
 	CommitDetailScreen
 	DiffViewScreen
 )
+
+type CommitsLoadedMsg struct {
+	Commits []types.GraphCommit
+}
 
 type Model struct {
 	Incoming           []types.Commit
@@ -50,6 +55,8 @@ type Model struct {
 	ShowLegend         bool
 	GraphViewport      viewport.Model
 	GraphViewportReady bool
+	GitService         *git.Service
+	LoadingCommits     bool
 }
 
 func InitialModel() Model {
@@ -75,6 +82,8 @@ func InitialModel() Model {
 		CompareModalIdx:    0,
 		ShowLegend:         false,
 		GraphViewportReady: false,
+		GitService:         nil,
+		LoadingCommits:     false,
 	}
 }
 
@@ -88,6 +97,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Width = msg.Width
 		m.Height = msg.Height
 		// Initialize or resize graph viewport
+		if m.Screen == GraphScreen {
+			m = m.initGraphViewport()
+		}
+		return m, nil
+
+	case CommitsLoadedMsg:
+		m.GraphCommits = msg.Commits
+		m.LoadingCommits = false
+		m.GraphIdx = 0
+		// Reinitialize viewport with new content
 		if m.Screen == GraphScreen {
 			m = m.initGraphViewport()
 		}
@@ -264,6 +283,17 @@ func (m Model) findCommitByHash(hash string) types.Commit {
 	return types.Commit{Hash: hash, Message: "Commit details", Author: "Unknown", Files: []types.FileChange{}}
 }
 
+func (m Model) loadCommitsCmd(branch string, limit int) tea.Cmd {
+	return tea.Cmd(func() tea.Msg {
+		commits, err := m.GitService.GetCommits(branch, limit)
+		if err != nil {
+			// For simplicity, return empty on error
+			return CommitsLoadedMsg{Commits: []types.GraphCommit{}}
+		}
+		return CommitsLoadedMsg{Commits: commits}
+	})
+}
+
 func (m Model) updateDivergence(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q":
@@ -406,6 +436,8 @@ func (m Model) updateBranchModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.Branches) > 0 {
 			m.CurrentBranch = m.Branches[m.BranchModalIdx].Name
 			m.ShowBranchModal = false
+			m.LoadingCommits = true
+			return m, m.loadCommitsCmd(m.CurrentBranch, 100)
 		}
 	}
 	return m, nil

@@ -88,6 +88,27 @@ func (s *Service) GetCurrentBranch() (string, error) {
 	return head.Name().Short(), nil
 }
 
+func (s *Service) GetFileContent(commitHash, filePath string) (string, error) {
+	hash := plumbing.NewHash(commitHash)
+	commit, err := s.repo.CommitObject(hash)
+
+	if err != nil {
+		return "", err
+	}
+
+	file, err := commit.File(filePath)
+	if err != nil {
+		return "", err
+	}
+
+	content, err := file.Contents()
+	if err != nil {
+		return "", err
+	}
+
+	return content, nil
+}
+
 func (s *Service) GetCommits(branch string, limit int) ([]types.GraphCommit, error) {
 	// Build hash → branch names map
 	branchMap := make(map[string][]string)

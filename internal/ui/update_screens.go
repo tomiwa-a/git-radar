@@ -122,7 +122,19 @@ func (m Model) initViewport() Model {
 	m.Viewport.YPosition = headerHeight
 
 	file := m.SelectedCommit.Files[m.FileIdx]
-	code := utils.GetDummyCode(file.Path)
+
+	var code string
+	if m.GitService != nil {
+		content, err := m.GitService.GetFileContent(m.SelectedCommit.FullHash, file.Path)
+		if err != nil {
+			code = "Error loading file: " + err.Error()
+		} else {
+			code = content
+		}
+	} else {
+		code = "Git service not available"
+	}
+
 	content := utils.RenderCodeWithLineNumbers(code, file.Path, m.Width)
 	m.Viewport.SetContent(content)
 	m.ViewportReady = true

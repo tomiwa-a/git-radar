@@ -15,3 +15,14 @@ type FileChange struct {
 	Additions int
 	Deletions int
 }
+
+type GraphCommit struct {
+	Hash       string
+	Message    string
+	Author     string
+	Date       string
+	Branches   []string
+	Parents    []string
+	GraphChars string
+	IsMerge    bool
+}

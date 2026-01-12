@@ -1,0 +1,85 @@
+package screens
+
+import (
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/tomiwa-a/git-radar/utils"
+)
+
+func RenderBranchModal(width, height int, branches []string, selectedIdx int, currentBranch string) string {
+	modalWidth := 40
+
+	borderStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#BD93F9")).
+		Padding(1, 2)
+
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#F8F8F2")).
+		MarginBottom(1)
+
+	hintStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#6272A4")).
+		MarginTop(1)
+
+	selectedStyle := lipgloss.NewStyle().
+		Background(lipgloss.Color("#44475A")).
+		Foreground(lipgloss.Color("#F8F8F2")).
+		Bold(true).
+		Width(modalWidth - 6)
+
+	normalStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#F8F8F2")).
+		Width(modalWidth - 6)
+
+	currentMarker := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#50FA7B")).
+		Bold(true)
+
+	var content strings.Builder
+
+	title := titleStyle.Render("Switch Branch")
+	escHint := utils.DetailsLabelStyle.Render("ESC")
+	titleLine := title + strings.Repeat(" ", modalWidth-lipgloss.Width(title)-lipgloss.Width(escHint)-4) + escHint
+	content.WriteString(titleLine + "\n\n")
+
+	maxVisible := height - 12
+	if maxVisible < 3 {
+		maxVisible = 3
+	}
+
+	startIdx := 0
+	if len(branches) > maxVisible && selectedIdx >= maxVisible {
+		startIdx = selectedIdx - maxVisible + 1
+	}
+	endIdx := startIdx + maxVisible
+	if endIdx > len(branches) {
+		endIdx = len(branches)
+	}
+
+	for i := startIdx; i < endIdx; i++ {
+		branch := branches[i]
+		suffix := ""
+
+		if branch == currentBranch {
+			suffix = currentMarker.Render(" (current)")
+		}
+
+		if i == selectedIdx {
+			content.WriteString(selectedStyle.Render("→ "+branch+suffix) + "\n")
+		} else {
+			content.WriteString(normalStyle.Render("  "+branch+suffix) + "\n")
+		}
+	}
+
+	hints := hintStyle.Render("↑/↓: select │ enter: switch │ esc: close")
+	content.WriteString("\n" + hints)
+
+	modal := borderStyle.Render(content.String())
+
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, modal,
+		lipgloss.WithWhitespaceChars(" "),
+		lipgloss.WithWhitespaceForeground(lipgloss.Color("#282A36")))
+}

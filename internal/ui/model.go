@@ -17,120 +17,58 @@ const (
 type Screen int
 
 const (
-	DashboardScreen Screen = iota
-	FileListScreen
+	GraphScreen Screen = iota
+	DivergenceScreen
+	CommitDetailScreen
 	DiffViewScreen
 )
 
 type Model struct {
-	Incoming       []types.Commit
-	Outgoing       []types.Commit
-	ActivePane     Pane
-	IncomingIdx    int
-	OutgoingIdx    int
-	Width          int
-	Height         int
-	TargetBranch   string
-	SourceBranch   string
-	Screen         Screen
-	SelectedCommit types.Commit
-	FileIdx        int
-	Viewport       viewport.Model
-	ViewportReady  bool
+	Incoming         []types.Commit
+	Outgoing         []types.Commit
+	ActivePane       Pane
+	IncomingIdx      int
+	OutgoingIdx      int
+	Width            int
+	Height           int
+	TargetBranch     string
+	SourceBranch     string
+	Screen           Screen
+	SelectedCommit   types.Commit
+	FileIdx          int
+	Viewport         viewport.Model
+	ViewportReady    bool
+	GraphCommits     []types.GraphCommit
+	GraphIdx         int
+	CurrentBranch    string
+	Branches         []string
+	ShowBranchModal  bool
+	BranchModalIdx   int
+	ShowCompareModal bool
+	CompareModalIdx  int
 }
 
 func InitialModel() Model {
 	return Model{
-		Incoming: []types.Commit{
-			{
-				Hash:    "a1b2c3d",
-				Message: "Fix payment processing bug",
-				Author:  "Alice Chen",
-				Email:   "alice@example.com",
-				Date:    "2026-01-10 09:15",
-				Files: []types.FileChange{
-					{Status: "M", Path: "src/payments/processor.go", Additions: 23, Deletions: 8},
-					{Status: "M", Path: "src/payments/validator.go", Additions: 15, Deletions: 3},
-				},
-			},
-			{
-				Hash:    "d4e5f6g",
-				Message: "Update README with new API docs",
-				Author:  "Bob Smith",
-				Email:   "bob@example.com",
-				Date:    "2026-01-09 16:42",
-				Files: []types.FileChange{
-					{Status: "M", Path: "README.md", Additions: 45, Deletions: 12},
-				},
-			},
-			{
-				Hash:    "h7i8j9k",
-				Message: "Bump dependencies to latest",
-				Author:  "Alice Chen",
-				Email:   "alice@example.com",
-				Date:    "2026-01-09 11:20",
-				Files: []types.FileChange{
-					{Status: "M", Path: "go.mod", Additions: 5, Deletions: 5},
-					{Status: "M", Path: "go.sum", Additions: 120, Deletions: 98},
-				},
-			},
-		},
-		Outgoing: []types.Commit{
-			{
-				Hash:    "e5f6g7h",
-				Message: "Add user input validation",
-				Author:  "You",
-				Email:   "you@example.com",
-				Date:    "2026-01-11 14:30",
-				Files: []types.FileChange{
-					{Status: "A", Path: "src/validation/rules.go", Additions: 87, Deletions: 0},
-					{Status: "M", Path: "src/handlers/user.go", Additions: 34, Deletions: 12},
-				},
-			},
-			{
-				Hash:    "i9j0k1l",
-				Message: "Refactor auth module",
-				Author:  "You",
-				Email:   "you@example.com",
-				Date:    "2026-01-11 11:15",
-				Files: []types.FileChange{
-					{Status: "M", Path: "src/auth/jwt.go", Additions: 56, Deletions: 23},
-					{Status: "M", Path: "src/auth/middleware.go", Additions: 28, Deletions: 15},
-					{Status: "D", Path: "src/auth/legacy.go", Additions: 0, Deletions: 145},
-				},
-			},
-			{
-				Hash:    "m2n3o4p",
-				Message: "Add rate limiting middleware",
-				Author:  "You",
-				Email:   "you@example.com",
-				Date:    "2026-01-10 17:45",
-				Files: []types.FileChange{
-					{Status: "A", Path: "src/middleware/rate_limit.go", Additions: 142, Deletions: 0},
-					{Status: "A", Path: "src/config/limits.yaml", Additions: 28, Deletions: 0},
-					{Status: "M", Path: "src/server.go", Additions: 12, Deletions: 3},
-				},
-			},
-			{
-				Hash:    "q5r6s7t",
-				Message: "Fix typo in config loader",
-				Author:  "You",
-				Email:   "you@example.com",
-				Date:    "2026-01-10 10:22",
-				Files: []types.FileChange{
-					{Status: "M", Path: "src/config/loader.go", Additions: 1, Deletions: 1},
-				},
-			},
-		},
-		ActivePane:   IncomingPane,
-		IncomingIdx:  0,
-		OutgoingIdx:  0,
-		Width:        80,
-		Height:       24,
-		TargetBranch: "main",
-		SourceBranch: "feature/user-validation",
-		Screen:       DashboardScreen,
-		FileIdx:      0,
+		GraphCommits:     DummyGraphCommits,
+		Branches:         DummyBranches,
+		CurrentBranch:    "main",
+		GraphIdx:         0,
+		Incoming:         DummyIncoming,
+		Outgoing:         DummyOutgoing,
+		ActivePane:       IncomingPane,
+		IncomingIdx:      0,
+		OutgoingIdx:      0,
+		Width:            80,
+		Height:           24,
+		TargetBranch:     "",
+		SourceBranch:     "",
+		Screen:           GraphScreen,
+		FileIdx:          0,
+		ShowBranchModal:  false,
+		BranchModalIdx:   0,
+		ShowCompareModal: false,
+		CompareModalIdx:  0,
 	}
 }
 
@@ -150,11 +88,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 
+		if m.ShowBranchModal {
+			return m.updateBranchModal(msg)
+		}
+
+		if m.ShowCompareModal {
+			return m.updateCompareModal(msg)
+		}
+
+		if msg.String() == "b" {
+			m.ShowBranchModal = true
+			m.BranchModalIdx = 0
+			for i, branch := range m.Branches {
+				if branch == m.CurrentBranch {
+					m.BranchModalIdx = i
+					break
+				}
+			}
+			return m, nil
+		}
+
 		switch m.Screen {
-		case DashboardScreen:
-			return m.updateDashboard(msg)
-		case FileListScreen:
-			return m.updateFileList(msg)
+		case GraphScreen:
+			return m.updateGraph(msg)
+		case DivergenceScreen:
+			return m.updateDivergence(msg)
+		case CommitDetailScreen:
+			return m.updateCommitDetail(msg)
 		case DiffViewScreen:
 			return m.updateDiffs(msg)
 		}
@@ -162,7 +122,63 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) updateDashboard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "q":
+		return m, tea.Quit
+
+	case "up", "k":
+		if m.GraphIdx > 0 {
+			m.GraphIdx--
+		}
+
+	case "down", "j":
+		if m.GraphIdx < len(m.GraphCommits)-1 {
+			m.GraphIdx++
+		}
+
+	case "enter":
+		if len(m.GraphCommits) > 0 {
+			gc := m.GraphCommits[m.GraphIdx]
+			m.SelectedCommit = m.findCommitByHash(gc.Hash)
+			if m.SelectedCommit.Hash != "" {
+				m.Screen = CommitDetailScreen
+				m.FileIdx = 0
+			}
+		}
+
+	case "c":
+		m.ShowCompareModal = true
+		m.CompareModalIdx = 0
+	}
+	return m, nil
+}
+
+func (m Model) getComparableBranches() []string {
+	var branches []string
+	for _, branch := range m.Branches {
+		if branch != m.CurrentBranch {
+			branches = append(branches, branch)
+		}
+	}
+	return branches
+}
+
+func (m Model) findCommitByHash(hash string) types.Commit {
+	for _, c := range m.Incoming {
+		if c.Hash == hash {
+			return c
+		}
+	}
+	for _, c := range m.Outgoing {
+		if c.Hash == hash {
+			return c
+		}
+	}
+	return types.Commit{Hash: hash, Message: "Commit details", Author: "Unknown", Files: []types.FileChange{}}
+}
+
+func (m Model) updateDivergence(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q":
 		return m, tea.Quit
@@ -201,20 +217,23 @@ func (m Model) updateDashboard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.SelectedCommit = m.Outgoing[m.OutgoingIdx]
 		}
 		if m.SelectedCommit.Hash != "" {
-			m.Screen = FileListScreen
+			m.Screen = CommitDetailScreen
 			m.FileIdx = 0
 		}
+
+	case "esc":
+		m.Screen = GraphScreen
 	}
 	return m, nil
 }
 
-func (m Model) updateFileList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateCommitDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q":
 		return m, tea.Quit
 
 	case "esc":
-		m.Screen = DashboardScreen
+		m.Screen = GraphScreen
 		m.SelectedCommit = types.Commit{}
 		m.FileIdx = 0
 
@@ -244,7 +263,7 @@ func (m Model) updateDiffs(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case "esc":
-		m.Screen = FileListScreen
+		m.Screen = CommitDetailScreen
 		m.FileIdx = 0
 		m.ViewportReady = false
 
@@ -280,4 +299,56 @@ func (m Model) initViewport() Model {
 	m.ViewportReady = true
 
 	return m
+}
+
+func (m Model) updateBranchModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "b":
+		m.ShowBranchModal = false
+
+	case "up", "k":
+		if m.BranchModalIdx > 0 {
+			m.BranchModalIdx--
+		}
+
+	case "down", "j":
+		if m.BranchModalIdx < len(m.Branches)-1 {
+			m.BranchModalIdx++
+		}
+
+	case "enter":
+		if len(m.Branches) > 0 {
+			m.CurrentBranch = m.Branches[m.BranchModalIdx]
+			m.ShowBranchModal = false
+		}
+	}
+	return m, nil
+}
+
+func (m Model) updateCompareModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	comparableBranches := m.getComparableBranches()
+
+	switch msg.String() {
+	case "esc", "c":
+		m.ShowCompareModal = false
+
+	case "up", "k":
+		if m.CompareModalIdx > 0 {
+			m.CompareModalIdx--
+		}
+
+	case "down", "j":
+		if m.CompareModalIdx < len(comparableBranches)-1 {
+			m.CompareModalIdx++
+		}
+
+	case "enter":
+		if len(comparableBranches) > 0 {
+			m.TargetBranch = comparableBranches[m.CompareModalIdx]
+			m.SourceBranch = m.CurrentBranch
+			m.ShowCompareModal = false
+			m.Screen = DivergenceScreen
+		}
+	}
+	return m, nil
 }

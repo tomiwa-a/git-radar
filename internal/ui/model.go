@@ -4,6 +4,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/tomiwa-a/git-radar/internal/types"
+	"github.com/tomiwa-a/git-radar/internal/ui/screens"
 	"github.com/tomiwa-a/git-radar/utils"
 )
 
@@ -24,53 +25,56 @@ const (
 )
 
 type Model struct {
-	Incoming         []types.Commit
-	Outgoing         []types.Commit
-	ActivePane       Pane
-	IncomingIdx      int
-	OutgoingIdx      int
-	Width            int
-	Height           int
-	TargetBranch     string
-	SourceBranch     string
-	Screen           Screen
-	SelectedCommit   types.Commit
-	FileIdx          int
-	Viewport         viewport.Model
-	ViewportReady    bool
-	GraphCommits     []types.GraphCommit
-	GraphIdx         int
-	CurrentBranch    string
-	Branches         []types.Branch
-	ShowBranchModal  bool
-	BranchModalIdx   int
-	ShowCompareModal bool
-	CompareModalIdx  int
-	ShowLegend       bool
+	Incoming           []types.Commit
+	Outgoing           []types.Commit
+	ActivePane         Pane
+	IncomingIdx        int
+	OutgoingIdx        int
+	Width              int
+	Height             int
+	TargetBranch       string
+	SourceBranch       string
+	Screen             Screen
+	SelectedCommit     types.Commit
+	FileIdx            int
+	Viewport           viewport.Model
+	ViewportReady      bool
+	GraphCommits       []types.GraphCommit
+	GraphIdx           int
+	CurrentBranch      string
+	Branches           []types.Branch
+	ShowBranchModal    bool
+	BranchModalIdx     int
+	ShowCompareModal   bool
+	CompareModalIdx    int
+	ShowLegend         bool
+	GraphViewport      viewport.Model
+	GraphViewportReady bool
 }
 
 func InitialModel() Model {
 	return Model{
-		GraphCommits:     DummyGraphCommits,
-		Branches:         nil,
-		CurrentBranch:    "",
-		GraphIdx:         0,
-		Incoming:         DummyIncoming,
-		Outgoing:         DummyOutgoing,
-		ActivePane:       IncomingPane,
-		IncomingIdx:      0,
-		OutgoingIdx:      0,
-		Width:            80,
-		Height:           24,
-		TargetBranch:     "",
-		SourceBranch:     "",
-		Screen:           GraphScreen,
-		FileIdx:          0,
-		ShowBranchModal:  false,
-		BranchModalIdx:   0,
-		ShowCompareModal: false,
-		CompareModalIdx:  0,
-		ShowLegend:       false,
+		GraphCommits:       DummyGraphCommits,
+		Branches:           nil,
+		CurrentBranch:      "",
+		GraphIdx:           0,
+		Incoming:           DummyIncoming,
+		Outgoing:           DummyOutgoing,
+		ActivePane:         IncomingPane,
+		IncomingIdx:        0,
+		OutgoingIdx:        0,
+		Width:              80,
+		Height:             24,
+		TargetBranch:       "",
+		SourceBranch:       "",
+		Screen:             GraphScreen,
+		FileIdx:            0,
+		ShowBranchModal:    false,
+		BranchModalIdx:     0,
+		ShowCompareModal:   false,
+		CompareModalIdx:    0,
+		ShowLegend:         false,
+		GraphViewportReady: false,
 	}
 }
 
@@ -83,6 +87,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
+		// Initialize or resize graph viewport
+		if m.Screen == GraphScreen {
+			m = m.initGraphViewport()
+		}
 		return m, nil
 
 	case tea.KeyMsg:
@@ -142,12 +150,18 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "up", "k":
 		if !m.ShowLegend && m.GraphIdx > 0 {
 			m.GraphIdx--
+			m = m.updateGraphViewportContent()
+			m = m.scrollToGraphSelection()
 		}
+		return m, nil
 
 	case "down", "j":
 		if !m.ShowLegend && m.GraphIdx < len(m.GraphCommits)-1 {
 			m.GraphIdx++
+			m = m.updateGraphViewportContent()
+			m = m.scrollToGraphSelection()
 		}
+		return m, nil
 
 	case "enter":
 		if !m.ShowLegend && len(m.GraphCommits) > 0 {
@@ -164,8 +178,63 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.ShowCompareModal = true
 			m.CompareModalIdx = 0
 		}
+
+	case "pgup", "pgdown", "home", "end":
+		// Only page keys scroll the viewport directly
+		if !m.ShowLegend && m.GraphViewportReady {
+			var cmd tea.Cmd
+			m.GraphViewport, cmd = m.GraphViewport.Update(msg)
+			return m, cmd
+		}
 	}
 	return m, nil
+}
+
+// linesPerCommit is approximate lines each commit takes in the UI
+const linesPerCommit = 4
+
+func (m Model) scrollToGraphSelection() Model {
+	if !m.GraphViewportReady {
+		return m
+	}
+
+	// Calculate where the selected commit is in the content
+	selectedLine := m.GraphIdx * linesPerCommit
+	viewportHeight := m.GraphViewport.Height
+	currentTop := m.GraphViewport.YOffset
+
+	// If selection is above viewport, scroll up
+	if selectedLine < currentTop {
+		m.GraphViewport.SetYOffset(selectedLine)
+	}
+
+	// If selection is below viewport, scroll down
+	if selectedLine >= currentTop+viewportHeight-linesPerCommit {
+		m.GraphViewport.SetYOffset(selectedLine - viewportHeight + linesPerCommit + 1)
+	}
+
+	return m
+}
+
+func (m Model) initGraphViewport() Model {
+	headerHeight := 3 // header + divider + padding
+	footerHeight := 2 // footer
+	m.GraphViewport = viewport.New(m.Width, m.Height-headerHeight-footerHeight)
+	m.GraphViewport.YPosition = headerHeight
+
+	content := screens.RenderGraphContent(m.Width, m.GraphCommits, m.GraphIdx)
+	m.GraphViewport.SetContent(content)
+	m.GraphViewportReady = true
+
+	return m
+}
+
+func (m Model) updateGraphViewportContent() Model {
+	if m.GraphViewportReady {
+		content := screens.RenderGraphContent(m.Width, m.GraphCommits, m.GraphIdx)
+		m.GraphViewport.SetContent(content)
+	}
+	return m
 }
 
 func (m Model) getComparableBranches() []string {

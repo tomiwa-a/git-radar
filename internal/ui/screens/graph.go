@@ -26,10 +26,10 @@ var (
 )
 
 func RenderGraph(width int, commits []types.GraphCommit, selectedIdx int, currentBranch string) string {
-	return RenderGraphWithLegend(width, 24, commits, selectedIdx, currentBranch, false)
+	return RenderGraphWithLegend(width, 24, commits, selectedIdx, currentBranch, false, "")
 }
 
-func RenderGraphWithLegend(width, height int, commits []types.GraphCommit, selectedIdx int, currentBranch string, showLegend bool) string {
+func RenderGraphWithLegend(width, height int, commits []types.GraphCommit, selectedIdx int, currentBranch string, showLegend bool, viewportContent string) string {
 	if showLegend {
 		return renderLegend(width, height)
 	}
@@ -52,18 +52,28 @@ func RenderGraphWithLegend(width, height int, commits []types.GraphCommit, selec
 	divider := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#44475A")).
 		Render(strings.Repeat("─", width))
-	b.WriteString(divider + "\n\n")
+	b.WriteString(divider + "\n")
 
-	// Render commits
+	// Viewport content (scrollable area)
+	b.WriteString(viewportContent)
+
+	// Footer
+	b.WriteString("\n")
+	footer := utils.DetailsLabelStyle.Render("↑/↓: scroll │ enter: view commit │ b: branches │ c: compare │ ?: help │ q: quit")
+	b.WriteString(footer)
+
+	return b.String()
+}
+
+// RenderGraphContent renders just the commit list content for the viewport
+func RenderGraphContent(width int, commits []types.GraphCommit, selectedIdx int) string {
+	var b strings.Builder
+	b.WriteString("\n")
+
 	for i, commit := range commits {
 		isSelected := i == selectedIdx
 		renderCommitBlock(&b, commit, isSelected, width)
 	}
-
-	// Footer
-	b.WriteString("\n")
-	footer := utils.DetailsLabelStyle.Render("↑/↓: navigate │ enter: view commit │ b: branches │ c: compare │ ?: help │ q: quit")
-	b.WriteString(footer)
 
 	return b.String()
 }

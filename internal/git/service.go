@@ -109,6 +109,79 @@ func (s *Service) GetFileContent(commitHash, filePath string) (string, error) {
 	return content, nil
 }
 
+func (s *Service) GetFileDiff(commitHash, filePath string) ([]types.DiffLine, error) {
+	hash := plumbing.NewHash(commitHash)
+	commit, err := s.repo.CommitObject(hash)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(commit.ParentHashes) == 0 {
+		file, err := commit.File(filePath)
+		if err != nil {
+			return nil, err
+		}
+		content, err := file.Contents()
+		if err != nil {
+			return nil, err
+		}
+		var lines []types.DiffLine
+		for _, line := range strings.Split(content, "\n") {
+			lines = append(lines, types.DiffLine{Type: "add", Content: line})
+		}
+		return lines, nil
+	}
+
+	parent, err := commit.Parent(0)
+	if err != nil {
+		return nil, err
+	}
+
+	patch, err := parent.Patch(commit)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, fp := range patch.FilePatches() {
+		from, to := fp.Files()
+		var patchPath string
+		if to != nil {
+			patchPath = to.Path()
+		} else if from != nil {
+			patchPath = from.Path()
+		}
+
+		if patchPath != filePath {
+			continue
+		}
+
+		var lines []types.DiffLine
+		for _, chunk := range fp.Chunks() {
+			content := chunk.Content()
+			chunkLines := strings.Split(content, "\n")
+
+			for i, line := range chunkLines {
+				if i == len(chunkLines)-1 && line == "" {
+					continue
+				}
+				var lineType string
+				switch chunk.Type() {
+				case diff.Add:
+					lineType = "add"
+				case diff.Delete:
+					lineType = "del"
+				default:
+					lineType = "equal"
+				}
+				lines = append(lines, types.DiffLine{Type: lineType, Content: line})
+			}
+		}
+		return lines, nil
+	}
+
+	return nil, nil
+}
+
 func (s *Service) GetCommits(branch string, limit int) ([]types.GraphCommit, error) {
 	// Build hash → branch names map
 	branchMap := make(map[string][]string)

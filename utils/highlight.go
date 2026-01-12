@@ -10,6 +10,7 @@ import (
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/tomiwa-a/git-radar/internal/types"
 )
 
 func HighlightCode(code string, filename string) string {
@@ -62,6 +63,79 @@ func RenderCodeWithLineNumbers(code string, filename string, width int) string {
 		divider := dividerStyle.Render("│")
 		result.WriteString(lineNum + divider + " " + line)
 		if i < len(lines)-1 {
+			result.WriteString("\n")
+		}
+	}
+
+	return result.String()
+}
+
+func RenderDiffLines(diffLines []types.DiffLine, filename string) string {
+	addStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#50FA7B"))
+
+	delStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#FF5555"))
+
+	lineNumStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#6272A4")).
+		Width(4).
+		Align(lipgloss.Right)
+
+	dividerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#44475A"))
+
+	var equalLines []int
+	var equalCode strings.Builder
+	for i, dl := range diffLines {
+		if dl.Type == "equal" {
+			equalLines = append(equalLines, i)
+			equalCode.WriteString(dl.Content + "\n")
+		}
+	}
+
+	highlightedEqual := ""
+	if equalCode.Len() > 0 {
+		highlightedEqual = HighlightCode(equalCode.String(), filename)
+	}
+	highlightedEqualLines := strings.Split(highlightedEqual, "\n")
+
+	var result strings.Builder
+	lineNum := 1
+	equalIdx := 0
+
+	for i, dl := range diffLines {
+		var prefix string
+		var numStr string
+		var codeLine string
+
+		switch dl.Type {
+		case "add":
+			prefix = addStyle.Render("+")
+			numStr = fmt.Sprintf("%d", lineNum)
+			codeLine = addStyle.Render(dl.Content)
+			lineNum++
+		case "del":
+			prefix = delStyle.Render("-")
+			numStr = " "
+			codeLine = delStyle.Render(dl.Content)
+		default:
+			prefix = " "
+			numStr = fmt.Sprintf("%d", lineNum)
+			if equalIdx < len(highlightedEqualLines) {
+				codeLine = highlightedEqualLines[equalIdx]
+				equalIdx++
+			} else {
+				codeLine = dl.Content
+			}
+			lineNum++
+		}
+
+		num := lineNumStyle.Render(numStr)
+		divider := dividerStyle.Render("│")
+		result.WriteString(num + divider + prefix + " " + codeLine)
+
+		if i < len(diffLines)-1 {
 			result.WriteString("\n")
 		}
 	}

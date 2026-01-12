@@ -10,7 +10,7 @@ func (m Model) View() string {
 
 	switch m.Screen {
 	case GraphScreen:
-		baseView = screens.RenderGraph(m.Width, m.GraphCommits, m.GraphIdx, m.CurrentBranch)
+		baseView = screens.RenderGraphWithLegend(m.Width, m.Height, m.GraphCommits, m.GraphIdx, m.CurrentBranch, m.ShowLegend)
 	case CommitDetailScreen:
 		baseView = screens.RenderFileList(m.Width, m.SelectedCommit, m.FileIdx)
 	case DiffViewScreen:

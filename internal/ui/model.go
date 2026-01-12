@@ -46,6 +46,7 @@ type Model struct {
 	BranchModalIdx   int
 	ShowCompareModal bool
 	CompareModalIdx  int
+	ShowLegend       bool
 }
 
 func InitialModel() Model {
@@ -69,6 +70,7 @@ func InitialModel() Model {
 		BranchModalIdx:   0,
 		ShowCompareModal: false,
 		CompareModalIdx:  0,
+		ShowLegend:       false,
 	}
 }
 
@@ -127,18 +129,28 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q":
 		return m, tea.Quit
 
+	case "?":
+		m.ShowLegend = !m.ShowLegend
+		return m, nil
+
+	case "esc":
+		if m.ShowLegend {
+			m.ShowLegend = false
+			return m, nil
+		}
+
 	case "up", "k":
-		if m.GraphIdx > 0 {
+		if !m.ShowLegend && m.GraphIdx > 0 {
 			m.GraphIdx--
 		}
 
 	case "down", "j":
-		if m.GraphIdx < len(m.GraphCommits)-1 {
+		if !m.ShowLegend && m.GraphIdx < len(m.GraphCommits)-1 {
 			m.GraphIdx++
 		}
 
 	case "enter":
-		if len(m.GraphCommits) > 0 {
+		if !m.ShowLegend && len(m.GraphCommits) > 0 {
 			gc := m.GraphCommits[m.GraphIdx]
 			m.SelectedCommit = m.findCommitByHash(gc.Hash)
 			if m.SelectedCommit.Hash != "" {
@@ -148,8 +160,10 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "c":
-		m.ShowCompareModal = true
-		m.CompareModalIdx = 0
+		if !m.ShowLegend {
+			m.ShowCompareModal = true
+			m.CompareModalIdx = 0
+		}
 	}
 	return m, nil
 }

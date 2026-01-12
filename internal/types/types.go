@@ -26,3 +26,11 @@ type GraphCommit struct {
 	GraphChars string
 	IsMerge    bool
 }
+
+type Branch struct {
+	Name     string
+	FullName string
+	Hash     string
+	IsRemote bool
+	IsHead   bool
+}

@@ -41,7 +41,7 @@ type Model struct {
 	GraphCommits     []types.GraphCommit
 	GraphIdx         int
 	CurrentBranch    string
-	Branches         []string
+	Branches         []types.Branch
 	ShowBranchModal  bool
 	BranchModalIdx   int
 	ShowCompareModal bool
@@ -51,8 +51,8 @@ type Model struct {
 func InitialModel() Model {
 	return Model{
 		GraphCommits:     DummyGraphCommits,
-		Branches:         DummyBranches,
-		CurrentBranch:    "main",
+		Branches:         nil,
+		CurrentBranch:    "",
 		GraphIdx:         0,
 		Incoming:         DummyIncoming,
 		Outgoing:         DummyOutgoing,
@@ -100,7 +100,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.ShowBranchModal = true
 			m.BranchModalIdx = 0
 			for i, branch := range m.Branches {
-				if branch == m.CurrentBranch {
+				if branch.Name == m.CurrentBranch {
 					m.BranchModalIdx = i
 					break
 				}
@@ -157,8 +157,8 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) getComparableBranches() []string {
 	var branches []string
 	for _, branch := range m.Branches {
-		if branch != m.CurrentBranch {
-			branches = append(branches, branch)
+		if branch.Name != m.CurrentBranch {
+			branches = append(branches, branch.Name)
 		}
 	}
 	return branches
@@ -318,7 +318,7 @@ func (m Model) updateBranchModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "enter":
 		if len(m.Branches) > 0 {
-			m.CurrentBranch = m.Branches[m.BranchModalIdx]
+			m.CurrentBranch = m.Branches[m.BranchModalIdx].Name
 			m.ShowBranchModal = false
 		}
 	}

@@ -34,6 +34,14 @@ func main() {
 		model.CurrentBranch = currentBranch
 	}
 
+	// Load commits for graph
+	commits, err := gitService.GetCommits(100)
+	if err != nil {
+		fmt.Printf("Warning: could not load commits: %v\n", err)
+	} else {
+		model.GraphCommits = commits
+	}
+
 	p := tea.NewProgram(model, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v", err)

@@ -122,8 +122,21 @@ func (m Model) initViewport() Model {
 	m.Viewport.YPosition = headerHeight
 
 	file := m.SelectedCommit.Files[m.FileIdx]
-	code := utils.GetDummyCode(file.Path)
-	content := utils.RenderCodeWithLineNumbers(code, file.Path, m.Width)
+
+	var content string
+	if m.GitService != nil {
+		diffLines, err := m.GitService.GetFileDiff(m.SelectedCommit.FullHash, file.Path)
+		if err != nil {
+			content = "Error loading diff: " + err.Error()
+		} else if diffLines == nil {
+			content = "No changes in this file"
+		} else {
+			content = utils.RenderDiffLines(diffLines, file.Path)
+		}
+	} else {
+		content = "Git service not available"
+	}
+
 	m.Viewport.SetContent(content)
 	m.ViewportReady = true
 

@@ -3,7 +3,6 @@ package utils
 import (
 	"bytes"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/alecthomas/chroma/v2"
@@ -11,6 +10,7 @@ import (
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/tomiwa-a/git-radar/internal/types"
 )
 
 func HighlightCode(code string, filename string) string {
@@ -70,117 +70,75 @@ func RenderCodeWithLineNumbers(code string, filename string, width int) string {
 	return result.String()
 }
 
-func GetDummyCode(filename string) string {
-	ext := strings.ToLower(filepath.Ext(filename))
+func RenderDiffLines(diffLines []types.DiffLine, filename string) string {
+	addStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#50FA7B"))
 
-	switch ext {
-	case ".go":
-		return `package processor
+	delStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#FF5555"))
 
-import (
-	"fmt"
-	"time"
-)
+	lineNumStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#6272A4")).
+		Width(4).
+		Align(lipgloss.Right)
 
-type Payment struct {
-	ID        string
-	Amount    float64
-	Currency  string
-	Status    string
-	CreatedAt time.Time
-}
+	dividerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#44475A"))
 
-func ProcessPayment(p *Payment) error {
-	if p.Amount <= 0 {
-		return fmt.Errorf("invalid amount: %f", p.Amount)
-	}
-
-	p.Status = "processing"
-	
-	// Validate currency
-	if !isValidCurrency(p.Currency) {
-		return fmt.Errorf("unsupported currency: %s", p.Currency)
-	}
-
-	// Process the payment
-	err := chargeCard(p)
-	if err != nil {
-		p.Status = "failed"
-		return err
-	}
-
-	p.Status = "completed"
-	return nil
-}
-
-func isValidCurrency(currency string) bool {
-	validCurrencies := []string{"USD", "EUR", "GBP"}
-	for _, c := range validCurrencies {
-		if c == currency {
-			return true
+	var equalLines []int
+	var equalCode strings.Builder
+	for i, dl := range diffLines {
+		if dl.Type == "equal" {
+			equalLines = append(equalLines, i)
+			equalCode.WriteString(dl.Content + "\n")
 		}
 	}
-	return false
-}`
 
-	case ".md":
-		return `# Git-Radar
-
-A TUI tool for visualizing Git branch divergence.
-
-## Features
-
-- **Split-pane dashboard** - View incoming and outgoing commits
-- **Syntax highlighting** - Code diffs with full color support
-- **Function-aware diffs** - See which functions changed
-
-## Installation
-
-` + "```bash" + `
-go install github.com/tomiwa-a/git-radar@latest
-` + "```" + `
-
-## Usage
-
-Navigate to your git repository and run:
-
-` + "```bash" + `
-git-radar
-` + "```"
-
-	case ".yaml", ".yml":
-		return `rate_limits:
-  default:
-    requests_per_minute: 60
-    burst_size: 10
-    
-  authenticated:
-    requests_per_minute: 1000
-    burst_size: 100
-
-  premium:
-    requests_per_minute: 10000
-    burst_size: 500
-
-endpoints:
-  - path: /api/v1/payments
-    limit: authenticated
-    
-  - path: /api/v1/users
-    limit: default
-    
-  - path: /api/v1/admin
-    limit: premium`
-
-	default:
-		return `// Sample code file
-// This is placeholder content for demonstration
-
-function example() {
-    console.log("Hello, World!");
-    return true;
-}
-
-export default example;`
+	highlightedEqual := ""
+	if equalCode.Len() > 0 {
+		highlightedEqual = HighlightCode(equalCode.String(), filename)
 	}
+	highlightedEqualLines := strings.Split(highlightedEqual, "\n")
+
+	var result strings.Builder
+	lineNum := 1
+	equalIdx := 0
+
+	for i, dl := range diffLines {
+		var prefix string
+		var numStr string
+		var codeLine string
+
+		switch dl.Type {
+		case "add":
+			prefix = addStyle.Render("+")
+			numStr = fmt.Sprintf("%d", lineNum)
+			codeLine = addStyle.Render(dl.Content)
+			lineNum++
+		case "del":
+			prefix = delStyle.Render("-")
+			numStr = " "
+			codeLine = delStyle.Render(dl.Content)
+		default:
+			prefix = " "
+			numStr = fmt.Sprintf("%d", lineNum)
+			if equalIdx < len(highlightedEqualLines) {
+				codeLine = highlightedEqualLines[equalIdx]
+				equalIdx++
+			} else {
+				codeLine = dl.Content
+			}
+			lineNum++
+		}
+
+		num := lineNumStyle.Render(numStr)
+		divider := dividerStyle.Render("│")
+		result.WriteString(num + divider + prefix + " " + codeLine)
+
+		if i < len(diffLines)-1 {
+			result.WriteString("\n")
+		}
+	}
+
+	return result.String()
 }

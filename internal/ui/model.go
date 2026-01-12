@@ -59,12 +59,12 @@ type Model struct {
 
 func InitialModel() Model {
 	return Model{
-		GraphCommits:       DummyGraphCommits,
+		GraphCommits:       []types.GraphCommit{},
 		Branches:           nil,
 		CurrentBranch:      "",
 		GraphIdx:           0,
-		Incoming:           DummyIncoming,
-		Outgoing:           DummyOutgoing,
+		Incoming:           []types.GraphCommit{},
+		Outgoing:           []types.GraphCommit{},
 		ActivePane:         IncomingPane,
 		IncomingIdx:        0,
 		OutgoingIdx:        0,

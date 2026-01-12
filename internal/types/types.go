@@ -7,6 +7,11 @@ type FileChange struct {
 	Deletions int
 }
 
+type DiffLine struct {
+	Type    string // "add", "del", "equal"
+	Content string
+}
+
 // GraphCommit represents a commit in the visual graph
 type GraphCommit struct {
 	Hash       string

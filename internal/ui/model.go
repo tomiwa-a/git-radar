@@ -190,8 +190,8 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// linesPerCommit is approximate lines each commit takes in the UI
-const linesPerCommit = 4
+// linesPerCommit is now 1 for compact single-line format
+const linesPerCommit = 1
 
 func (m Model) scrollToGraphSelection() Model {
 	if !m.GraphViewportReady {
@@ -217,12 +217,14 @@ func (m Model) scrollToGraphSelection() Model {
 }
 
 func (m Model) initGraphViewport() Model {
-	headerHeight := 3 // header + divider + padding
-	footerHeight := 2 // footer
-	m.GraphViewport = viewport.New(m.Width, m.Height-headerHeight-footerHeight)
+	headerHeight := 4                     // header + panel header + divider
+	footerHeight := 1                     // footer
+	leftPaneWidth := (m.Width * 60) / 100 // 60% for commits list
+
+	m.GraphViewport = viewport.New(leftPaneWidth, m.Height-headerHeight-footerHeight)
 	m.GraphViewport.YPosition = headerHeight
 
-	content := screens.RenderGraphContent(m.Width, m.GraphCommits, m.GraphIdx)
+	content := screens.RenderGraphContent(leftPaneWidth, m.GraphCommits, m.GraphIdx)
 	m.GraphViewport.SetContent(content)
 	m.GraphViewportReady = true
 
@@ -231,7 +233,8 @@ func (m Model) initGraphViewport() Model {
 
 func (m Model) updateGraphViewportContent() Model {
 	if m.GraphViewportReady {
-		content := screens.RenderGraphContent(m.Width, m.GraphCommits, m.GraphIdx)
+		leftPaneWidth := (m.Width * 60) / 100
+		content := screens.RenderGraphContent(leftPaneWidth, m.GraphCommits, m.GraphIdx)
 		m.GraphViewport.SetContent(content)
 	}
 	return m

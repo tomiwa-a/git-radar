@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func RenderFileList(width int, commit types.Commit, fileIdx int) string {
+func RenderFileList(width int, commit types.GraphCommit, fileIdx int) string {
 	var b strings.Builder
 
 	backHint := utils.DetailsLabelStyle.Render("ESC: back")

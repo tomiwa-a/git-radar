@@ -30,8 +30,8 @@ type CommitsLoadedMsg struct {
 }
 
 type Model struct {
-	Incoming           []types.Commit
-	Outgoing           []types.Commit
+	Incoming           []types.GraphCommit
+	Outgoing           []types.GraphCommit
 	ActivePane         Pane
 	IncomingIdx        int
 	OutgoingIdx        int
@@ -40,7 +40,7 @@ type Model struct {
 	TargetBranch       string
 	SourceBranch       string
 	Screen             Screen
-	SelectedCommit     types.Commit
+	SelectedCommit     types.GraphCommit
 	FileIdx            int
 	Viewport           viewport.Model
 	ViewportReady      bool
@@ -185,7 +185,7 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		if !m.ShowLegend && len(m.GraphCommits) > 0 {
 			gc := m.GraphCommits[m.GraphIdx]
-			m.SelectedCommit = m.findCommitByHash(gc.Hash)
+			m.SelectedCommit = gc
 			if m.SelectedCommit.Hash != "" {
 				m.Screen = CommitDetailScreen
 				m.FileIdx = 0
@@ -269,7 +269,7 @@ func (m Model) getComparableBranches() []string {
 	return branches
 }
 
-func (m Model) findCommitByHash(hash string) types.Commit {
+func (m Model) findCommitByHash(hash string) types.GraphCommit {
 	for _, c := range m.Incoming {
 		if c.Hash == hash {
 			return c
@@ -280,7 +280,7 @@ func (m Model) findCommitByHash(hash string) types.Commit {
 			return c
 		}
 	}
-	return types.Commit{Hash: hash, Message: "Commit details", Author: "Unknown", Files: []types.FileChange{}}
+	return types.GraphCommit{Hash: hash, Message: "Commit details", Author: "Unknown", Files: []types.FileChange{}}
 }
 
 func (m Model) loadCommitsCmd(branch string, limit int) tea.Cmd {
@@ -350,7 +350,7 @@ func (m Model) updateCommitDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "esc":
 		m.Screen = GraphScreen
-		m.SelectedCommit = types.Commit{}
+		m.SelectedCommit = types.GraphCommit{}
 		m.FileIdx = 0
 
 	case "up", "k":

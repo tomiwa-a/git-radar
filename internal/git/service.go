@@ -160,8 +160,38 @@ func (s *Service) GetCommits(branch string, limit int) ([]types.GraphCommit, err
 		// Format message (first line only)
 		message := strings.Split(strings.TrimSpace(c.Message), "\n")[0]
 
+		// Build file change summary for this commit
+		var files []types.FileChange
+		if len(c.ParentHashes) > 0 {
+			// Use first parent to compute patch stats
+			parent, perr := c.Parent(0)
+			if perr == nil {
+				patch, perr := parent.Patch(c)
+				if perr == nil {
+					for _, stat := range patch.Stats() {
+						files = append(files, types.FileChange{
+							Status:    "M",
+							Path:      stat.Name,
+							Additions: stat.Addition,
+							Deletions: stat.Deletion,
+						})
+					}
+				}
+			}
+		} else {
+			// Root commit: mark files as added
+			tree, terr := c.Tree()
+			if terr == nil {
+				tree.Files().ForEach(func(f *object.File) error {
+					files = append(files, types.FileChange{Status: "A", Path: f.Name})
+					return nil
+				})
+			}
+		}
+
 		commit := types.GraphCommit{
 			Hash:       c.Hash.String()[:7],
+			FullHash:   c.Hash.String(),
 			Message:    message,
 			Author:     c.Author.Name,
 			Date:       utils.FormatRelativeTime(c.Author.When),
@@ -169,6 +199,7 @@ func (s *Service) GetCommits(branch string, limit int) ([]types.GraphCommit, err
 			Branches:   branchLabels,
 			GraphChars: graphChars,
 			IsMerge:    isMerge,
+			Files:      files,
 		}
 
 		commits = append(commits, commit)

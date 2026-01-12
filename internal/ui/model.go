@@ -1,9 +1,10 @@
 package ui
 
 import (
-	"github.com/tomiwa-a/git-radar/internal/types"
-
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/tomiwa-a/git-radar/internal/types"
+	"github.com/tomiwa-a/git-radar/utils"
 )
 
 type Pane int
@@ -34,6 +35,8 @@ type Model struct {
 	Screen         Screen
 	SelectedCommit types.Commit
 	FileIdx        int
+	Viewport       viewport.Model
+	ViewportReady  bool
 }
 
 func InitialModel() Model {
@@ -227,6 +230,7 @@ func (m Model) updateFileList(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		if len(m.SelectedCommit.Files) > 0 {
 			m.Screen = DiffViewScreen
+			m = m.initViewport()
 		}
 
 	}
@@ -241,18 +245,39 @@ func (m Model) updateDiffs(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "esc":
 		m.Screen = FileListScreen
-		// m.SelectedCommit = types.Commit{}
 		m.FileIdx = 0
+		m.ViewportReady = false
 
-	case "up", "k":
+	case "left", "h":
 		if m.FileIdx > 0 {
 			m.FileIdx--
+			m = m.initViewport()
 		}
 
-	case "down", "j":
+	case "right", "l":
 		if m.FileIdx < len(m.SelectedCommit.Files)-1 {
 			m.FileIdx++
+			m = m.initViewport()
 		}
+
+	default:
+		var cmd tea.Cmd
+		m.Viewport, cmd = m.Viewport.Update(msg)
+		return m, cmd
 	}
 	return m, nil
+}
+
+func (m Model) initViewport() Model {
+	headerHeight := 3
+	m.Viewport = viewport.New(m.Width, m.Height-headerHeight)
+	m.Viewport.YPosition = headerHeight
+
+	file := m.SelectedCommit.Files[m.FileIdx]
+	code := utils.GetDummyCode(file.Path)
+	content := utils.RenderCodeWithLineNumbers(code, file.Path, m.Width)
+	m.Viewport.SetContent(content)
+	m.ViewportReady = true
+
+	return m
 }

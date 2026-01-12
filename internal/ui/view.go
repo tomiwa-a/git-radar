@@ -9,7 +9,7 @@ func (m Model) View() string {
 	case FileListScreen:
 		return screens.RenderFileList(m.Width, m.SelectedCommit, m.FileIdx)
 	case DiffViewScreen:
-		return screens.RenderDiffs(m.Width, m.SelectedCommit, m.FileIdx)
+		return screens.RenderDiffs(m.Width, m.SelectedCommit, m.FileIdx, m.Viewport.View())
 	default:
 		return screens.RenderDashboard(
 			m.Width,

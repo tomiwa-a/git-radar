@@ -1,6 +1,7 @@
 package screens
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -8,21 +9,53 @@ import (
 	"github.com/tomiwa-a/git-radar/utils"
 )
 
-func RenderDiffs(width int, commit types.Commit, fileIdx int) string {
+func RenderDiffs(width int, commit types.Commit, fileIdx int, viewportContent string) string {
 	var b strings.Builder
 
-	backHint := utils.DetailsLabelStyle.Render("ESC: back")
-	commitInfo := utils.HashStyle.Render("← " + commit.Hash + " ")
-	commitMsg := utils.DetailsTitleStyle.Render(commit.Message)
-	fileName := utils.FileNameStyle.Render(commit.Files[fileIdx].Path)
-	headerGap := width - lipgloss.Width(backHint) - lipgloss.Width(commitInfo) - lipgloss.Width(commitMsg)
+	file := commit.Files[fileIdx]
+
+	backHint := utils.DetailsLabelStyle.Render("ESC: back  h/l: switch files  ↑↓: scroll")
+	fileName := utils.FileNameStyle.Render(file.Path)
+	stats := renderFileStats(file)
+
+	headerLine := lipgloss.JoinHorizontal(
+		lipgloss.Center,
+		fileName,
+		"  ",
+		stats,
+	)
+
+	headerGap := width - lipgloss.Width(headerLine) - lipgloss.Width(backHint)
 	if headerGap < 0 {
 		headerGap = 0
 	}
-	header := commitInfo + commitMsg + fileName + strings.Repeat(" ", headerGap) + backHint
-	b.WriteString(header + "\n\n")
+	header := headerLine + strings.Repeat(" ", headerGap) + backHint
+	b.WriteString(header + "\n")
 
-	b.WriteString(commit.Files[fileIdx].Path + "\n\n")
+	commitInfo := utils.HashStyle.Render(commit.Hash) +
+		" " +
+		utils.DetailsTitleStyle.Render(commit.Message) +
+		" " +
+		utils.DetailsLabelStyle.Render("by "+commit.Author)
+	b.WriteString(commitInfo + "\n")
+
+	divider := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#44475A")).
+		Render(strings.Repeat("─", width))
+	b.WriteString(divider + "\n")
+
+	b.WriteString(viewportContent)
 
 	return b.String()
+}
+
+func renderFileStats(file types.FileChange) string {
+	addStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#50FA7B")).Bold(true)
+	delStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5555")).Bold(true)
+
+	stats := addStyle.Render(fmt.Sprintf("+%d", file.Additions)) +
+		" " +
+		delStyle.Render(fmt.Sprintf("-%d", file.Deletions))
+
+	return stats
 }

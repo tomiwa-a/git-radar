@@ -1,14 +1,5 @@
 package types
 
-type Commit struct {
-	Hash    string
-	Message string
-	Author  string
-	Email   string
-	Date    string
-	Files   []FileChange
-}
-
 type FileChange struct {
 	Status    string
 	Path      string
@@ -16,8 +7,10 @@ type FileChange struct {
 	Deletions int
 }
 
+// GraphCommit represents a commit in the visual graph
 type GraphCommit struct {
 	Hash       string
+	FullHash   string
 	Message    string
 	Author     string
 	Date       string
@@ -25,4 +18,14 @@ type GraphCommit struct {
 	Parents    []string
 	GraphChars string
 	IsMerge    bool
+	Lane       int
+	Files      []FileChange
+}
+
+type Branch struct {
+	Name     string
+	FullName string
+	Hash     string
+	IsRemote bool
+	IsHead   bool
 }

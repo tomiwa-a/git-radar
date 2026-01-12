@@ -4,10 +4,11 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/tomiwa-a/git-radar/internal/types"
 	"github.com/tomiwa-a/git-radar/utils"
 )
 
-func RenderBranchModal(width, height int, branches []string, selectedIdx int, currentBranch string) string {
+func RenderBranchModal(width, height int, branches []types.Branch, selectedIdx int, currentBranch string) string {
 	modalWidth := 40
 
 	borderStyle := lipgloss.NewStyle().
@@ -38,6 +39,15 @@ func RenderBranchModal(width, height int, branches []string, selectedIdx int, cu
 		Foreground(lipgloss.Color("#50FA7B")).
 		Bold(true)
 
+	remoteMarker := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#8BE9FD")).
+		Italic(true)
+
+	sectionHeader := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#6272A4")).
+		Bold(true).
+		MarginTop(1)
+
 	var content strings.Builder
 
 	title := titleStyle.Render("Switch Branch")
@@ -45,7 +55,7 @@ func RenderBranchModal(width, height int, branches []string, selectedIdx int, cu
 	titleLine := title + strings.Repeat(" ", modalWidth-lipgloss.Width(title)-lipgloss.Width(escHint)-4) + escHint
 	content.WriteString(titleLine + "\n\n")
 
-	maxVisible := height - 12
+	maxVisible := height - 14
 	if maxVisible < 3 {
 		maxVisible = 3
 	}
@@ -59,18 +69,40 @@ func RenderBranchModal(width, height int, branches []string, selectedIdx int, cu
 		endIdx = len(branches)
 	}
 
+	// Track section headers
+	inLocalSection := false
+	inRemoteSection := false
+
 	for i := startIdx; i < endIdx; i++ {
 		branch := branches[i]
-		suffix := ""
 
-		if branch == currentBranch {
-			suffix = currentMarker.Render(" (current)")
+		// Add section headers
+		if !branch.IsRemote && !inLocalSection {
+			if i > startIdx {
+				content.WriteString("\n")
+			}
+			content.WriteString(sectionHeader.Render("Local") + "\n")
+			inLocalSection = true
+		} else if branch.IsRemote && !inRemoteSection {
+			content.WriteString("\n" + sectionHeader.Render("Remote") + "\n")
+			inRemoteSection = true
+		}
+
+		suffix := ""
+		displayName := branch.Name
+
+		if branch.IsHead {
+			suffix = currentMarker.Render(" ✓")
+		}
+
+		if branch.IsRemote {
+			displayName = remoteMarker.Render(branch.Name)
 		}
 
 		if i == selectedIdx {
-			content.WriteString(selectedStyle.Render("→ "+branch+suffix) + "\n")
+			content.WriteString(selectedStyle.Render("→ "+displayName+suffix) + "\n")
 		} else {
-			content.WriteString(normalStyle.Render("  "+branch+suffix) + "\n")
+			content.WriteString(normalStyle.Render("  "+displayName+suffix) + "\n")
 		}
 	}
 

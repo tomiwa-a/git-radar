@@ -10,7 +10,11 @@ func (m Model) View() string {
 
 	switch m.Screen {
 	case GraphScreen:
-		baseView = screens.RenderGraph(m.Width, m.GraphCommits, m.GraphIdx, m.CurrentBranch)
+		viewportContent := ""
+		if m.GraphViewportReady {
+			viewportContent = m.GraphViewport.View()
+		}
+		baseView = screens.RenderGraphWithLegend(m.Width, m.Height, m.GraphCommits, m.GraphIdx, m.CurrentBranch, m.ShowLegend, viewportContent, m.LoadingCommits)
 	case CommitDetailScreen:
 		baseView = screens.RenderFileList(m.Width, m.SelectedCommit, m.FileIdx)
 	case DiffViewScreen:
@@ -29,13 +33,13 @@ func (m Model) View() string {
 
 	if m.ShowBranchModal {
 		modal := screens.RenderBranchModal(m.Width, m.Height, m.Branches, m.BranchModalIdx, m.CurrentBranch)
-		return overlayModal(baseView, modal, m.Width, m.Height)
+		return modal
 	}
 
 	if m.ShowCompareModal {
 		comparableBranches := m.getComparableBranches()
 		modal := screens.RenderCompareModal(m.Width, m.Height, comparableBranches, m.CompareModalIdx, m.CurrentBranch)
-		return overlayModal(baseView, modal, m.Width, m.Height)
+		return modal
 	}
 
 	return baseView

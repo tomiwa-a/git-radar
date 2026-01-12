@@ -13,7 +13,7 @@ import (
 func RenderDashboard(
 	width int,
 	targetBranch, sourceBranch string,
-	incoming, outgoing []types.Commit,
+	incoming, outgoing []types.GraphCommit,
 	incomingIdx, outgoingIdx int,
 	activePane int,
 ) string {
@@ -51,7 +51,7 @@ func RenderDashboard(
 	panes := lipgloss.JoinHorizontal(lipgloss.Top, leftPane, rightPane)
 	b.WriteString(panes + "\n")
 
-	var selectedCommit types.Commit
+	var selectedCommit types.GraphCommit
 	if activePane == 0 && len(incoming) > 0 {
 		selectedCommit = incoming[incomingIdx]
 	} else if activePane == 1 && len(outgoing) > 0 {
@@ -68,7 +68,7 @@ func RenderDashboard(
 	return b.String()
 }
 
-func renderCommitList(commits []types.Commit, selectedIdx int, isActive bool) string {
+func renderCommitList(commits []types.GraphCommit, selectedIdx int, isActive bool) string {
 	var lines []string
 
 	for i, commit := range commits {
@@ -101,7 +101,7 @@ func renderCommitList(commits []types.Commit, selectedIdx int, isActive bool) st
 	return strings.Join(lines, "\n")
 }
 
-func renderDetails(commit types.Commit) string {
+func renderDetails(commit types.GraphCommit) string {
 	if commit.Hash == "" {
 		return utils.DetailsTitleStyle.Render("COMMIT DETAILS") + "\n\n" +
 			utils.DetailsValueStyle.Render("No commit selected")
@@ -114,7 +114,7 @@ func renderDetails(commit types.Commit) string {
 	b.WriteString(utils.HashStyle.Render(commit.Hash) + " ")
 	b.WriteString(utils.DetailsValueStyle.Render(commit.Message) + "\n")
 	b.WriteString(utils.DetailsLabelStyle.Render("Author: "))
-	b.WriteString(utils.DetailsValueStyle.Render(fmt.Sprintf("%s <%s>", commit.Author, commit.Email)) + "\n")
+	b.WriteString(utils.DetailsValueStyle.Render(commit.Author) + "\n")
 	b.WriteString(utils.DetailsLabelStyle.Render("Date:   "))
 	b.WriteString(utils.DetailsValueStyle.Render(commit.Date) + "\n\n")
 

@@ -9,7 +9,7 @@ import (
 	"github.com/tomiwa-a/git-radar/utils"
 )
 
-func RenderDiffs(width int, commit types.Commit, fileIdx int, viewportContent string) string {
+func RenderDiffs(width int, commit types.GraphCommit, fileIdx int, viewportContent string) string {
 	var b strings.Builder
 
 	file := commit.Files[fileIdx]

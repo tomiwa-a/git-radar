@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-func RenderFileList(width int, commit types.Commit, fileIdx int) string {
+func RenderFileList(width int, commit types.GraphCommit, fileIdx int) string {
 	var b strings.Builder
 
 	backHint := utils.DetailsLabelStyle.Render("ESC: back")
@@ -39,6 +39,7 @@ func RenderFileList(width int, commit types.Commit, fileIdx int) string {
 
 func renderFileItems(width int, files []types.FileChange, fileIdx int) string {
 	var lines []string
+	leftPad := "  "
 
 	for i, file := range files {
 		cursor := "  "
@@ -59,24 +60,37 @@ func renderFileItems(width int, files []types.FileChange, fileIdx int) string {
 		}
 
 		status := statusStyle.Render(file.Status)
-		path := utils.DetailsValueStyle.Render(file.Path)
 
-		additions := utils.FileAddedStyle.Render(fmt.Sprintf("+%d", file.Additions))
-		deletions := utils.FileDeletedStyle.Render(fmt.Sprintf("-%d", file.Deletions))
-		stats := fmt.Sprintf("%s  %s", additions, deletions)
+		rawAdd := fmt.Sprintf("+%4d", file.Additions)
+		rawDel := fmt.Sprintf("-%4d", file.Deletions)
+		statsRaw := fmt.Sprintf("%s    %s", rawAdd, rawDel)
 
-		pathWidth := width - 20
-		if len(file.Path) > pathWidth {
-			path = utils.DetailsValueStyle.Render("..." + file.Path[len(file.Path)-pathWidth+3:])
+		// Make stats bold and colored, keep fixed-width alignment
+		addStyle := utils.FileAddedStyle.Copy().Bold(true)
+		delStyle := utils.FileDeletedStyle.Copy().Bold(true)
+		statsStyled := fmt.Sprintf("%s    %s", addStyle.Render(fmt.Sprintf("+%4d", file.Additions)), delStyle.Render(fmt.Sprintf("-%4d", file.Deletions)))
+
+		statsWidth := len(statsRaw)
+		pathWidth := width - 20 - statsWidth
+		if pathWidth < 10 {
+			pathWidth = 10
 		}
 
-		line := fmt.Sprintf("%s%s  %-*s  %s", cursor, status, pathWidth, path, stats)
+		path := file.Path
+		if len(path) > pathWidth {
+			path = "..." + path[len(path)-pathWidth+3:]
+		}
+		path = utils.DetailsValueStyle.Render(path)
+
+		line := fmt.Sprintf("%s%s  %-*s  %s", leftPad+cursor, status, pathWidth, path, statsStyled)
 
 		if i == fileIdx {
 			line = utils.SelectedItemStyle.Render(line)
 		}
 
 		lines = append(lines, line)
+		// Add small vertical spacing for readability
+		lines = append(lines, "")
 	}
 
 	for len(lines) < 5 {

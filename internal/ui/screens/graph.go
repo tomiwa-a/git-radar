@@ -1,6 +1,7 @@
 package screens
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -8,80 +9,253 @@ import (
 	"github.com/tomiwa-a/git-radar/utils"
 )
 
+// Styles for the new graph UI
+var (
+	commitDotStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#BD93F9"))
+	selectedDotStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#50FA7B")).Bold(true)
+	mergeDotStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF79C6")).Bold(true)
+	hashStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFB86C")).Bold(true)
+	messageStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("#F8F8F2"))
+	dimStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color("#6272A4"))
+	localBranchStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#50FA7B"))
+	remoteBranchStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#8BE9FD"))
+	mainBranchStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#50FA7B")).Bold(true)
+	mergeTagStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF79C6")).Italic(true)
+	selectedBgStyle   = lipgloss.NewStyle().Background(lipgloss.Color("#44475A"))
+	paneBorderStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#44475A"))
+	sectionTitleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#BD93F9")).Bold(true)
+	branchCountStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFB86C"))
+)
+
 func RenderGraph(width int, commits []types.GraphCommit, selectedIdx int, currentBranch string) string {
+	return RenderGraphWithLegend(width, 24, commits, selectedIdx, currentBranch, false, "", false)
+}
+
+func RenderGraphWithLegend(width, height int, commits []types.GraphCommit, selectedIdx int, currentBranch string, showLegend bool, viewportContent string, loading bool) string {
+	if showLegend {
+		return utils.RenderLegend(
+			width, height,
+			selectedDotStyle, mergeDotStyle, branchCountStyle, mainBranchStyle, localBranchStyle, remoteBranchStyle, utils.DetailsLabelStyle,
+		)
+	}
+
 	var b strings.Builder
 
-	title := utils.TitleStyle.Render("Git-Radar")
-	branchLabel := utils.DetailsLabelStyle.Render("branch: ")
-	branchName := utils.BranchStyle.Render(currentBranch)
-	hints := utils.DetailsLabelStyle.Render("b: branches  c: compare  q: quit")
+	// Header
+	title := utils.TitleStyle.Render(" Git-Radar ")
+	branchLabel := utils.DetailsLabelStyle.Render("on: ")
+	branchName := utils.BranchStyle.Render(" " + currentBranch + " ")
+	help := utils.DetailsLabelStyle.Render("?: help")
 
-	headerGap := width - lipgloss.Width(title) - lipgloss.Width(branchLabel) - lipgloss.Width(branchName) - lipgloss.Width(hints)
+	headerGap := width - lipgloss.Width(title) - lipgloss.Width(branchLabel) - lipgloss.Width(branchName) - lipgloss.Width(help) - 4
 	if headerGap < 0 {
 		headerGap = 0
 	}
-	header := title + strings.Repeat(" ", headerGap/2) + branchLabel + branchName + strings.Repeat(" ", headerGap/2) + hints
+	header := title + strings.Repeat(" ", headerGap/2) + branchLabel + branchName + strings.Repeat(" ", headerGap/2) + help
 	b.WriteString(header + "\n")
 
-	divider := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#44475A")).
-		Render(strings.Repeat("─", width))
-	b.WriteString(divider + "\n\n")
+	// Calculate panel widths
+	leftPaneWidth := (width * 60) / 100         // 60% for commits
+	rightPaneWidth := width - leftPaneWidth - 3 // 3 for border
 
-	graphStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF79C6"))
-	hashStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFB86C"))
-	messageStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#F8F8F2"))
-	branchTagStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#50FA7B")).Bold(true)
-	headStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#8BE9FD")).Bold(true)
-	selectedStyle := lipgloss.NewStyle().Background(lipgloss.Color("#44475A"))
-	authorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6272A4"))
+	// Panel headers
+	leftHeader := sectionTitleStyle.Render("COMMITS")
+	rightHeader := sectionTitleStyle.Render("DETAILS")
 
-	for i, commit := range commits {
-		graph := graphStyle.Render(commit.GraphChars)
-		hash := hashStyle.Render(commit.Hash[:7])
+	headerLine := leftHeader + strings.Repeat(" ", leftPaneWidth-lipgloss.Width(leftHeader)) +
+		paneBorderStyle.Render("│") + " " + rightHeader
+	b.WriteString(headerLine + "\n")
 
-		var branchTags string
-		if len(commit.Branches) > 0 {
-			var tags []string
-			for _, branch := range commit.Branches {
-				if branch == "HEAD" {
-					tags = append(tags, headStyle.Render("HEAD"))
-				} else {
-					tags = append(tags, branchTagStyle.Render(branch))
-				}
-			}
-			branchTags = " (" + strings.Join(tags, ", ") + ")"
-		}
+	divider := paneBorderStyle.Render(strings.Repeat("─", leftPaneWidth) + "┼" + strings.Repeat("─", rightPaneWidth+1))
+	b.WriteString(divider + "\n")
 
-		msg := messageStyle.Render(truncateMessage(commit.Message, 50))
-		author := authorStyle.Render(" <" + commit.Author + ">")
-
-		line := graph + hash + branchTags + " " + msg + author
-
-		if i == selectedIdx {
-			line = selectedStyle.Render(line + strings.Repeat(" ", max(0, width-lipgloss.Width(line))))
-		}
-
-		b.WriteString(line + "\n")
+	// Get selected commit for details panel
+	var selectedCommit *types.GraphCommit
+	if selectedIdx >= 0 && selectedIdx < len(commits) {
+		selectedCommit = &commits[selectedIdx]
 	}
 
-	b.WriteString("\n")
-	footer := utils.DetailsLabelStyle.Render("↑/↓: navigate │ enter: view commit │ b: branches │ c: compare │ q: quit")
+	// Viewport content on left, details on right
+	leftContent := viewportContent
+	if loading {
+		leftContent = "Loading commits...\n"
+	}
+	rightContent := renderDetailsPanel(rightPaneWidth, selectedCommit, height-6)
+
+	// Split viewport content into lines
+	leftLines := strings.Split(leftContent, "\n")
+	rightLines := strings.Split(rightContent, "\n")
+
+	// Render side by side
+	contentHeight := height - 6 // header + panel header + divider + footer
+	for i := 0; i < contentHeight; i++ {
+		leftLine := ""
+		if i < len(leftLines) {
+			leftLine = leftLines[i]
+		}
+
+		rightLine := ""
+		if i < len(rightLines) {
+			rightLine = rightLines[i]
+		}
+
+		// Pad left line to width
+		leftLineWidth := lipgloss.Width(leftLine)
+		if leftLineWidth < leftPaneWidth {
+			leftLine += strings.Repeat(" ", leftPaneWidth-leftLineWidth)
+		}
+
+		b.WriteString(leftLine + paneBorderStyle.Render("│") + " " + rightLine + "\n")
+	}
+
+	// Footer
+	footer := utils.DetailsLabelStyle.Render("↑/↓: navigate │ enter: view files │ b: branches │ c: compare │ ?: help │ q: quit")
 	b.WriteString(footer)
 
 	return b.String()
 }
 
-func truncateMessage(msg string, maxLen int) string {
-	if len(msg) <= maxLen {
-		return msg
+// RenderGraphContent renders compact commit lines for the viewport
+func RenderGraphContent(width int, commits []types.GraphCommit, selectedIdx int) string {
+	var b strings.Builder
+
+	msgWidth := width - 25
+	if msgWidth < 20 {
+		msgWidth = 20
 	}
-	return msg[:maxLen-3] + "..."
+
+	for i, commit := range commits {
+		isSelected := i == selectedIdx
+		line := renderCompactCommitLine(commit, isSelected, width, msgWidth)
+		b.WriteString(line + "\n")
+	}
+
+	return b.String()
 }
 
-func max(a, b int) int {
-	if a > b {
-		return a
+func renderCompactCommitLine(commit types.GraphCommit, isSelected bool, width, msgWidth int) string {
+	// Dot
+	var dot string
+	if isSelected {
+		dot = selectedDotStyle.Render("●")
+	} else if commit.IsMerge {
+		dot = mergeDotStyle.Render("◆")
+	} else {
+		dot = commitDotStyle.Render("○")
 	}
-	return b
+
+	// Hash
+	hash := hashStyle.Render(commit.Hash)
+
+	// Message (truncated)
+	msg := utils.TruncateMessage(commit.Message, msgWidth)
+	msgStyled := messageStyle.Render(msg)
+
+	// Time (compact)
+	timeStr := utils.CompactTime(commit.Date)
+	timeStyled := dimStyle.Render(timeStr)
+
+	// Branch indicator
+	var branchIndicator string
+	if len(commit.Branches) > 0 {
+		hasMain := false
+		for _, br := range commit.Branches {
+			if br == "main" || br == "master" {
+				hasMain = true
+				break
+			}
+		}
+		if hasMain {
+			branchIndicator = mainBranchStyle.Render("★")
+		} else {
+			branchIndicator = branchCountStyle.Render(fmt.Sprintf("⚑%d", len(commit.Branches)))
+		}
+	}
+
+	// Build line
+	line := " " + dot + " " + hash + " " + msgStyled
+
+	// Calculate padding
+	currentWidth := lipgloss.Width(line)
+	rightPart := timeStyled
+	if branchIndicator != "" {
+		rightPart = timeStyled + " " + branchIndicator
+	}
+	rightWidth := lipgloss.Width(rightPart)
+
+	padding := width - currentWidth - rightWidth - 2
+	if padding < 1 {
+		padding = 1
+	}
+
+	line = line + strings.Repeat(" ", padding) + rightPart
+
+	if isSelected {
+		line = selectedBgStyle.Render(line + strings.Repeat(" ", max(0, width-lipgloss.Width(line))))
+	}
+
+	return line
+}
+
+func renderDetailsPanel(width int, commit *types.GraphCommit, height int) string {
+	if commit == nil {
+		return dimStyle.Render("  No commit selected")
+	}
+
+	var b strings.Builder
+
+	// Hash
+	b.WriteString(" " + hashStyle.Render(commit.Hash) + "\n")
+	b.WriteString("\n")
+
+	// Full message (wrap if needed)
+	msgLines := utils.WrapText(commit.Message, width-2)
+	for _, line := range msgLines {
+		b.WriteString(" " + messageStyle.Render(line) + "\n")
+	}
+	b.WriteString("\n")
+
+	// Author and time
+	b.WriteString(" " + dimStyle.Render(commit.Author) + "\n")
+	b.WriteString(" " + dimStyle.Render(commit.Date) + "\n")
+	b.WriteString("\n")
+
+	// Divider
+	b.WriteString(" " + paneBorderStyle.Render(strings.Repeat("─", width-2)) + "\n")
+	b.WriteString("\n")
+
+	// Branches section
+	if len(commit.Branches) > 0 {
+		b.WriteString(" " + sectionTitleStyle.Render("BRANCHES") + "\n")
+		for _, branch := range commit.Branches {
+			isRemote := strings.HasPrefix(branch, "origin/")
+			isMain := branch == "main" || branch == "master" || branch == "origin/main" || branch == "origin/master"
+
+			var branchLine string
+			if isMain {
+				branchLine = " • " + mainBranchStyle.Render(branch+" ★")
+			} else if isRemote {
+				branchLine = " • " + remoteBranchStyle.Render(branch) + dimStyle.Render(" (remote)")
+			} else {
+				branchLine = " • " + localBranchStyle.Render(branch)
+			}
+			b.WriteString(branchLine + "\n")
+		}
+		b.WriteString("\n")
+	}
+
+	// Parents section (for merge commits)
+	if len(commit.Parents) > 1 {
+		b.WriteString(" " + sectionTitleStyle.Render("PARENTS") + " " + mergeTagStyle.Render("(merge)") + "\n")
+		for _, parent := range commit.Parents {
+			short := parent
+			if len(parent) > 7 {
+				short = parent[:7]
+			}
+			b.WriteString(" " + dimStyle.Render("├ ") + hashStyle.Render(short) + "\n")
+		}
+		b.WriteString("\n")
+	}
+
+	return b.String()
 }

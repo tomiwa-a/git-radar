@@ -3,6 +3,7 @@ package git
 import (
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/go-git/go-git/v6"
 	"github.com/go-git/go-git/v6/plumbing"
@@ -194,6 +195,9 @@ func (s *Service) GetFileDiff(commitHash, filePath string) ([]types.DiffLine, er
 }
 
 func (s *Service) GetCommits(branch string, limit int) ([]types.GraphCommit, error) {
+	start := time.Now()
+	defer func() { utils.LogTiming("GetCommits("+branch+")", time.Since(start)) }()
+
 	var fromHash plumbing.Hash
 	if branch != "" {
 		ref, err := s.repo.Reference(plumbing.NewBranchReferenceName(branch), true)
@@ -274,6 +278,9 @@ func (s *Service) GetCommits(branch string, limit int) ([]types.GraphCommit, err
 }
 
 func (s *Service) GetCommitDetails(fullHash string) ([]types.ParentInfo, []types.FileChange, error) {
+	start := time.Now()
+	defer func() { utils.LogTiming("GetCommitDetails("+fullHash[:7]+")", time.Since(start)) }()
+
 	hash := plumbing.NewHash(fullHash)
 	c, err := s.repo.CommitObject(hash)
 	if err != nil {

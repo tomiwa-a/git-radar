@@ -3,25 +3,29 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/tomiwa-a/git-radar/internal/git"
 	"github.com/tomiwa-a/git-radar/internal/ui"
+	"github.com/tomiwa-a/git-radar/utils"
 )
 
 func main() {
-	// Initialize git service
+	appStart := time.Now()
+
+	utils.InitLogger()
+	defer utils.CloseLogger()
+
 	gitService, err := git.NewService(".")
 	if err != nil {
 		fmt.Printf("Error: not a git repository: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Create model with git data
 	model := ui.InitialModel()
 	model.GitService = gitService
 
-	// Load branches
 	branches, err := gitService.GetBranches()
 	if err != nil {
 		fmt.Printf("Warning: could not load branches: %v\n", err)
@@ -29,19 +33,19 @@ func main() {
 		model.Branches = branches
 	}
 
-	// Get current branch
 	currentBranch, err := gitService.GetCurrentBranch()
 	if err == nil {
 		model.CurrentBranch = currentBranch
 	}
 
-	// Load commits for graph (for current branch)
 	commits, err := gitService.GetCommits(currentBranch, 100)
 	if err != nil {
 		fmt.Printf("Warning: could not load commits: %v\n", err)
 	} else {
 		model.GraphCommits = commits
 	}
+
+	utils.LogTiming("App startup", time.Since(appStart))
 
 	p := tea.NewProgram(model, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {

@@ -71,11 +71,20 @@ func RenderCodeWithLineNumbers(code string, filename string, width int) string {
 }
 
 func RenderDiffLines(diffLines []types.DiffLine, filename string) string {
+	const collapseThreshold = 8
+	const contextLines = 3
+
+	collapsed := collapseDiffLines(diffLines, collapseThreshold, contextLines)
+
 	addStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#50FA7B"))
 
 	delStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#FF5555"))
+
+	collapseStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#6272A4")).
+		Italic(true)
 
 	lineNumStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#6272A4")).
@@ -85,11 +94,9 @@ func RenderDiffLines(diffLines []types.DiffLine, filename string) string {
 	dividerStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#44475A"))
 
-	var equalLines []int
 	var equalCode strings.Builder
-	for i, dl := range diffLines {
+	for _, dl := range collapsed {
 		if dl.Type == "equal" {
-			equalLines = append(equalLines, i)
 			equalCode.WriteString(dl.Content + "\n")
 		}
 	}
@@ -104,7 +111,7 @@ func RenderDiffLines(diffLines []types.DiffLine, filename string) string {
 	lineNum := 1
 	equalIdx := 0
 
-	for i, dl := range diffLines {
+	for i, dl := range collapsed {
 		var prefix string
 		var numStr string
 		var codeLine string
@@ -119,6 +126,10 @@ func RenderDiffLines(diffLines []types.DiffLine, filename string) string {
 			prefix = delStyle.Render("-")
 			numStr = " "
 			codeLine = delStyle.Render(dl.Content)
+		case "collapse":
+			prefix = " "
+			numStr = " "
+			codeLine = collapseStyle.Render(dl.Content)
 		default:
 			prefix = " "
 			numStr = fmt.Sprintf("%d", lineNum)
@@ -135,10 +146,56 @@ func RenderDiffLines(diffLines []types.DiffLine, filename string) string {
 		divider := dividerStyle.Render("│")
 		result.WriteString(num + divider + prefix + " " + codeLine)
 
-		if i < len(diffLines)-1 {
+		if i < len(collapsed)-1 {
 			result.WriteString("\n")
 		}
 	}
 
 	return result.String()
+}
+
+func collapseDiffLines(lines []types.DiffLine, threshold, context int) []types.DiffLine {
+	var result []types.DiffLine
+	i := 0
+
+	for i < len(lines) {
+		if lines[i].Type != "equal" {
+			result = append(result, lines[i])
+			i++
+			continue
+		}
+
+		runStart := i
+		for i < len(lines) && lines[i].Type == "equal" {
+			i++
+		}
+		runEnd := i
+		runLen := runEnd - runStart
+
+		if runLen > threshold {
+			for j := runStart; j < runStart+context && j < runEnd; j++ {
+				result = append(result, lines[j])
+			}
+
+			hidden := runLen - (context * 2)
+			if hidden > 0 {
+				result = append(result, types.DiffLine{
+					Type:    "collapse",
+					Content: fmt.Sprintf("⋯ %d lines hidden ⋯", hidden),
+				})
+			}
+
+			for j := runEnd - context; j < runEnd; j++ {
+				if j >= runStart+context {
+					result = append(result, lines[j])
+				}
+			}
+		} else {
+			for j := runStart; j < runEnd; j++ {
+				result = append(result, lines[j])
+			}
+		}
+	}
+
+	return result
 }

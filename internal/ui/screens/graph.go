@@ -204,57 +204,81 @@ func renderDetailsPanel(width int, commit *types.GraphCommit, height int) string
 
 	var b strings.Builder
 
-	// Hash
-	b.WriteString(" " + hashStyle.Render(commit.Hash) + "\n")
+	// Hash with dot
+	dot := commitDotStyle.Render("●")
+	if commit.IsMerge {
+		dot = mergeDotStyle.Render("◆")
+	}
+	b.WriteString(" " + dot + " " + hashStyle.Render(commit.Hash) + "\n")
 	b.WriteString("\n")
 
-	// Full message (wrap if needed)
+	// Message
 	msgLines := utils.WrapText(commit.Message, width-2)
 	for _, line := range msgLines {
 		b.WriteString(" " + messageStyle.Render(line) + "\n")
 	}
 	b.WriteString("\n")
 
-	// Author and time
-	b.WriteString(" " + dimStyle.Render(commit.Author) + "\n")
-	b.WriteString(" " + dimStyle.Render(commit.Date) + "\n")
-	b.WriteString("\n")
-
 	// Divider
 	b.WriteString(" " + paneBorderStyle.Render(strings.Repeat("─", width-2)) + "\n")
 	b.WriteString("\n")
 
-	// Branches section
-	if len(commit.Branches) > 0 {
-		b.WriteString(" " + sectionTitleStyle.Render("BRANCHES") + "\n")
-		for _, branch := range commit.Branches {
-			isRemote := strings.HasPrefix(branch, "origin/")
-			isMain := branch == "main" || branch == "master" || branch == "origin/main" || branch == "origin/master"
+	// Info section with labels
+	b.WriteString(" " + dimStyle.Render("Author") + "    " + messageStyle.Render(commit.Author) + "\n")
+	b.WriteString(" " + dimStyle.Render("Date") + "      " + messageStyle.Render(commit.Date) + "\n")
 
-			var branchLine string
-			if isMain {
-				branchLine = " • " + mainBranchStyle.Render(branch+" ★")
-			} else if isRemote {
-				branchLine = " • " + remoteBranchStyle.Render(branch) + dimStyle.Render(" (remote)")
-			} else {
-				branchLine = " • " + localBranchStyle.Render(branch)
-			}
-			b.WriteString(branchLine + "\n")
+	// Branch (show first branch ref or current viewing branch)
+	if len(commit.Branches) > 0 {
+		b.WriteString(" " + dimStyle.Render("Branch") + "    " + localBranchStyle.Render(commit.Branches[0]) + "\n")
+	}
+	b.WriteString("\n")
+
+	// Files summary
+	if len(commit.Files) > 0 {
+		totalAdds := 0
+		totalDels := 0
+		for _, f := range commit.Files {
+			totalAdds += f.Additions
+			totalDels += f.Deletions
 		}
+		filesLabel := fmt.Sprintf("%d files changed", len(commit.Files))
+		statsLabel := fmt.Sprintf("+%d -%d", totalAdds, totalDels)
+		addStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#50FA7B"))
+		delStyleLocal := lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5555"))
+		b.WriteString(" " + dimStyle.Render(filesLabel) + "  " + addStyle.Render(fmt.Sprintf("+%d", totalAdds)) + " " + delStyleLocal.Render(fmt.Sprintf("-%d", totalDels)) + "\n")
+		_ = statsLabel // suppress unused warning
 		b.WriteString("\n")
 	}
 
-	// Parents section (for merge commits)
-	if len(commit.Parents) > 1 {
-		b.WriteString(" " + sectionTitleStyle.Render("PARENTS") + " " + mergeTagStyle.Render("(merge)") + "\n")
-		for _, parent := range commit.Parents {
-			short := parent
-			if len(parent) > 7 {
-				short = parent[:7]
-			}
-			b.WriteString(" " + dimStyle.Render("├ ") + hashStyle.Render(short) + "\n")
+	// Merge section (only for merge commits)
+	if commit.IsMerge && len(commit.ParentInfos) >= 2 {
+		b.WriteString(" " + paneBorderStyle.Render(strings.Repeat("─", width-2)) + "\n")
+		b.WriteString("\n")
+		b.WriteString(" " + mergeDotStyle.Render("◆ MERGE") + "\n")
+		b.WriteString("\n")
+
+		// From (feature branch - second parent)
+		from := commit.ParentInfos[1]
+		b.WriteString(" " + dimStyle.Render("From:") + " " + hashStyle.Render(from.Hash) + "\n")
+		fromMsgLines := utils.WrapText(from.Message, width-8)
+		for _, line := range fromMsgLines {
+			b.WriteString("       " + dimStyle.Render(line) + "\n")
+		}
+		if from.Branch != "" {
+			b.WriteString("       " + localBranchStyle.Render(from.Branch) + "\n")
 		}
 		b.WriteString("\n")
+
+		// Into (main branch - first parent)
+		into := commit.ParentInfos[0]
+		b.WriteString(" " + dimStyle.Render("Into:") + " " + hashStyle.Render(into.Hash) + "\n")
+		intoMsgLines := utils.WrapText(into.Message, width-8)
+		for _, line := range intoMsgLines {
+			b.WriteString("       " + dimStyle.Render(line) + "\n")
+		}
+		if into.Branch != "" {
+			b.WriteString("       " + mainBranchStyle.Render(into.Branch) + "\n")
+		}
 	}
 
 	return b.String()

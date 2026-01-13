@@ -304,17 +304,38 @@ func (s *Service) GetCommits(branch string, limit int) ([]types.GraphCommit, err
 			}
 		}
 
+		var parentInfos []types.ParentInfo
+		if isMerge {
+			for _, ph := range c.ParentHashes {
+				parentCommit, perr := s.repo.CommitObject(ph)
+				if perr == nil {
+					parentMsg := strings.Split(strings.TrimSpace(parentCommit.Message), "\n")[0]
+					parentBranches := branchMap[ph.String()]
+					branchName := ""
+					if len(parentBranches) > 0 {
+						branchName = parentBranches[0]
+					}
+					parentInfos = append(parentInfos, types.ParentInfo{
+						Hash:    ph.String()[:7],
+						Message: parentMsg,
+						Branch:  branchName,
+					})
+				}
+			}
+		}
+
 		commit := types.GraphCommit{
-			Hash:       c.Hash.String()[:7],
-			FullHash:   c.Hash.String(),
-			Message:    message,
-			Author:     c.Author.Name,
-			Date:       utils.FormatRelativeTime(c.Author.When),
-			Parents:    parents,
-			Branches:   branchLabels,
-			GraphChars: graphChars,
-			IsMerge:    isMerge,
-			Files:      files,
+			Hash:        c.Hash.String()[:7],
+			FullHash:    c.Hash.String(),
+			Message:     message,
+			Author:      c.Author.Name,
+			Date:        utils.FormatRelativeTime(c.Author.When),
+			Parents:     parents,
+			ParentInfos: parentInfos,
+			Branches:    branchLabels,
+			GraphChars:  graphChars,
+			IsMerge:     isMerge,
+			Files:       files,
 		}
 
 		commits = append(commits, commit)

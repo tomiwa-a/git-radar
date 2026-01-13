@@ -8,23 +8,30 @@ type FileChange struct {
 }
 
 type DiffLine struct {
-	Type    string // "add", "del", "equal"
+	Type    string // "add", "del", "equal", "collapse"
 	Content string
+}
+
+type ParentInfo struct {
+	Hash    string
+	Message string
+	Branch  string
 }
 
 // GraphCommit represents a commit in the visual graph
 type GraphCommit struct {
-	Hash       string
-	FullHash   string
-	Message    string
-	Author     string
-	Date       string
-	Branches   []string
-	Parents    []string
-	GraphChars string
-	IsMerge    bool
-	Lane       int
-	Files      []FileChange
+	Hash        string
+	FullHash    string
+	Message     string
+	Author      string
+	Date        string
+	Branches    []string
+	Parents     []string
+	ParentInfos []ParentInfo
+	GraphChars  string
+	IsMerge     bool
+	Lane        int
+	Files       []FileChange
 }
 
 type Branch struct {

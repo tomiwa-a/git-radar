@@ -13,7 +13,8 @@ import (
 )
 
 type Service struct {
-	repo *git.Repository
+	repo      *git.Repository
+	branchMap map[string][]string
 }
 
 func NewService(path string) (*Service, error) {
@@ -21,7 +22,17 @@ func NewService(path string) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Service{repo: repo}, nil
+	s := &Service{repo: repo}
+	s.BuildBranchMap()
+	return s, nil
+}
+
+func (s *Service) BuildBranchMap() {
+	s.branchMap = make(map[string][]string)
+	branches, _ := s.GetBranches()
+	for _, b := range branches {
+		s.branchMap[b.Hash] = append(s.branchMap[b.Hash], b.Name)
+	}
 }
 
 func (s *Service) GetBranches() ([]types.Branch, error) {
@@ -183,22 +194,12 @@ func (s *Service) GetFileDiff(commitHash, filePath string) ([]types.DiffLine, er
 }
 
 func (s *Service) GetCommits(branch string, limit int) ([]types.GraphCommit, error) {
-	// Build hash → branch names map
-	branchMap := make(map[string][]string)
-	branches, _ := s.GetBranches()
-	for _, b := range branches {
-		branchMap[b.Hash] = append(branchMap[b.Hash], b.Name)
-	}
-
-	// Resolve branch to reference
 	var fromHash plumbing.Hash
 	if branch != "" {
 		ref, err := s.repo.Reference(plumbing.NewBranchReferenceName(branch), true)
 		if err != nil {
-			// Try remote branch
 			ref, err = s.repo.Reference(plumbing.NewRemoteReferenceName("origin", branch), true)
 			if err != nil {
-				// Fall back to HEAD
 				head, headErr := s.repo.Head()
 				if headErr != nil {
 					return nil, headErr
@@ -211,7 +212,6 @@ func (s *Service) GetCommits(branch string, limit int) ([]types.GraphCommit, err
 			fromHash = ref.Hash()
 		}
 	} else {
-		// Use HEAD if no branch specified
 		head, err := s.repo.Head()
 		if err != nil {
 			return nil, err
@@ -219,7 +219,6 @@ func (s *Service) GetCommits(branch string, limit int) ([]types.GraphCommit, err
 		fromHash = head.Hash()
 	}
 
-	// Get commit log
 	commitIter, err := s.repo.Log(&git.LogOptions{
 		From:  fromHash,
 		Order: git.LogOrderCommitterTime,
@@ -236,106 +235,30 @@ func (s *Service) GetCommits(branch string, limit int) ([]types.GraphCommit, err
 			return nil
 		}
 
-		// Get parent hashes
 		var parents []string
 		for _, p := range c.ParentHashes {
 			parents = append(parents, p.String())
 		}
 
-		// Determine graph character
 		graphChars := "* "
 		isMerge := len(parents) > 1
 		if isMerge {
 			graphChars = "*─┐"
 		}
 
-		// Get branch labels for this commit
-		branchLabels := branchMap[c.Hash.String()]
-
-		// Format message (first line only)
+		branchLabels := s.branchMap[c.Hash.String()]
 		message := strings.Split(strings.TrimSpace(c.Message), "\n")[0]
 
-		var files []types.FileChange
-		if len(c.ParentHashes) > 0 {
-			parent, perr := c.Parent(0)
-			if perr == nil {
-				patch, perr := parent.Patch(c)
-				if perr == nil {
-					for _, fp := range patch.FilePatches() {
-						from, to := fp.Files()
-						name := ""
-						if to != nil {
-							name = to.Path()
-						} else if from != nil {
-							name = from.Path()
-						}
-						adds, dels := 0, 0
-						for _, chunk := range fp.Chunks() {
-							content := chunk.Content()
-							lines := strings.Count(content, "\n")
-							if len(content) > 0 && content[len(content)-1] != '\n' {
-								lines++
-							}
-							switch chunk.Type() {
-							case diff.Add:
-								adds += lines
-							case diff.Delete:
-								dels += lines
-							}
-						}
-						files = append(files, types.FileChange{Status: "M", Path: name, Additions: adds, Deletions: dels})
-					}
-				}
-			}
-		} else {
-			tree, terr := c.Tree()
-			if terr == nil {
-				tree.Files().ForEach(func(f *object.File) error {
-					additions := 0
-					if contents, cerr := f.Contents(); cerr == nil {
-						additions = strings.Count(contents, "\n")
-						if len(contents) > 0 && contents[len(contents)-1] != '\n' {
-							additions++
-						}
-					}
-					files = append(files, types.FileChange{Status: "A", Path: f.Name, Additions: additions, Deletions: 0})
-					return nil
-				})
-			}
-		}
-
-		var parentInfos []types.ParentInfo
-		if isMerge {
-			for _, ph := range c.ParentHashes {
-				parentCommit, perr := s.repo.CommitObject(ph)
-				if perr == nil {
-					parentMsg := strings.Split(strings.TrimSpace(parentCommit.Message), "\n")[0]
-					parentBranches := branchMap[ph.String()]
-					branchName := ""
-					if len(parentBranches) > 0 {
-						branchName = parentBranches[0]
-					}
-					parentInfos = append(parentInfos, types.ParentInfo{
-						Hash:    ph.String()[:7],
-						Message: parentMsg,
-						Branch:  branchName,
-					})
-				}
-			}
-		}
-
 		commit := types.GraphCommit{
-			Hash:        c.Hash.String()[:7],
-			FullHash:    c.Hash.String(),
-			Message:     message,
-			Author:      c.Author.Name,
-			Date:        utils.FormatRelativeTime(c.Author.When),
-			Parents:     parents,
-			ParentInfos: parentInfos,
-			Branches:    branchLabels,
-			GraphChars:  graphChars,
-			IsMerge:     isMerge,
-			Files:       files,
+			Hash:       c.Hash.String()[:7],
+			FullHash:   c.Hash.String(),
+			Message:    message,
+			Author:     c.Author.Name,
+			Date:       utils.FormatRelativeTime(c.Author.When),
+			Parents:    parents,
+			Branches:   branchLabels,
+			GraphChars: graphChars,
+			IsMerge:    isMerge,
 		}
 
 		commits = append(commits, commit)
@@ -348,4 +271,83 @@ func (s *Service) GetCommits(branch string, limit int) ([]types.GraphCommit, err
 	}
 
 	return commits, nil
+}
+
+func (s *Service) GetCommitDetails(fullHash string) ([]types.ParentInfo, []types.FileChange, error) {
+	hash := plumbing.NewHash(fullHash)
+	c, err := s.repo.CommitObject(hash)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var parentInfos []types.ParentInfo
+	if len(c.ParentHashes) > 1 {
+		for _, ph := range c.ParentHashes {
+			parentCommit, perr := s.repo.CommitObject(ph)
+			if perr == nil {
+				parentMsg := strings.Split(strings.TrimSpace(parentCommit.Message), "\n")[0]
+				parentBranches := s.branchMap[ph.String()]
+				branchName := ""
+				if len(parentBranches) > 0 {
+					branchName = parentBranches[0]
+				}
+				parentInfos = append(parentInfos, types.ParentInfo{
+					Hash:    ph.String()[:7],
+					Message: parentMsg,
+					Branch:  branchName,
+				})
+			}
+		}
+	}
+
+	var files []types.FileChange
+	if len(c.ParentHashes) > 0 {
+		parent, perr := c.Parent(0)
+		if perr == nil {
+			patch, perr := parent.Patch(c)
+			if perr == nil {
+				for _, fp := range patch.FilePatches() {
+					from, to := fp.Files()
+					name := ""
+					if to != nil {
+						name = to.Path()
+					} else if from != nil {
+						name = from.Path()
+					}
+					adds, dels := 0, 0
+					for _, chunk := range fp.Chunks() {
+						content := chunk.Content()
+						lines := strings.Count(content, "\n")
+						if len(content) > 0 && content[len(content)-1] != '\n' {
+							lines++
+						}
+						switch chunk.Type() {
+						case diff.Add:
+							adds += lines
+						case diff.Delete:
+							dels += lines
+						}
+					}
+					files = append(files, types.FileChange{Status: "M", Path: name, Additions: adds, Deletions: dels})
+				}
+			}
+		}
+	} else {
+		tree, terr := c.Tree()
+		if terr == nil {
+			tree.Files().ForEach(func(f *object.File) error {
+				additions := 0
+				if contents, cerr := f.Contents(); cerr == nil {
+					additions = strings.Count(contents, "\n")
+					if len(contents) > 0 && contents[len(contents)-1] != '\n' {
+						additions++
+					}
+				}
+				files = append(files, types.FileChange{Status: "A", Path: f.Name, Additions: additions, Deletions: 0})
+				return nil
+			})
+		}
+	}
+
+	return parentInfos, files, nil
 }

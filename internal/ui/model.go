@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"time"
+
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/tomiwa-a/git-radar/internal/git"
@@ -25,6 +27,16 @@ const (
 
 type CommitsLoadedMsg struct {
 	Commits []types.GraphCommit
+}
+
+type DetailsLoadedMsg struct {
+	FullHash    string
+	ParentInfos []types.ParentInfo
+	Files       []types.FileChange
+}
+
+type DebounceTickMsg struct {
+	FullHash string
 }
 
 type Model struct {
@@ -55,6 +67,8 @@ type Model struct {
 	GraphViewportReady bool
 	GitService         *git.Service
 	LoadingCommits     bool
+	LoadingDetails     bool
+	PendingDetailsHash string
 }
 
 func InitialModel() Model {
@@ -106,6 +120,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.Screen == GraphScreen {
 			m = m.initGraphViewport()
 		}
+		if len(m.GraphCommits) > 0 {
+			m.PendingDetailsHash = m.GraphCommits[0].FullHash
+			return m, m.debounceDetailsCmd(m.GraphCommits[0].FullHash)
+		}
+		return m, nil
+
+	case DebounceTickMsg:
+		if msg.FullHash == m.PendingDetailsHash && m.GitService != nil {
+			return m, m.loadDetailsCmd(msg.FullHash)
+		}
+		return m, nil
+
+	case DetailsLoadedMsg:
+		for i := range m.GraphCommits {
+			if m.GraphCommits[i].FullHash == msg.FullHash {
+				m.GraphCommits[i].ParentInfos = msg.ParentInfos
+				m.GraphCommits[i].Files = msg.Files
+				break
+			}
+		}
+		m.LoadingDetails = false
 		return m, nil
 
 	case tea.KeyMsg:
@@ -178,5 +213,25 @@ func (m Model) loadCommitsCmd(branch string, limit int) tea.Cmd {
 			return CommitsLoadedMsg{Commits: []types.GraphCommit{}}
 		}
 		return CommitsLoadedMsg{Commits: commits}
+	})
+}
+
+func (m Model) debounceDetailsCmd(fullHash string) tea.Cmd {
+	return tea.Tick(200*time.Millisecond, func(t time.Time) tea.Msg {
+		return DebounceTickMsg{FullHash: fullHash}
+	})
+}
+
+func (m Model) loadDetailsCmd(fullHash string) tea.Cmd {
+	return tea.Cmd(func() tea.Msg {
+		parentInfos, files, err := m.GitService.GetCommitDetails(fullHash)
+		if err != nil {
+			return DetailsLoadedMsg{FullHash: fullHash}
+		}
+		return DetailsLoadedMsg{
+			FullHash:    fullHash,
+			ParentInfos: parentInfos,
+			Files:       files,
+		}
 	})
 }

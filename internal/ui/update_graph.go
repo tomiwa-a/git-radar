@@ -28,6 +28,10 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.GraphIdx--
 			m = m.updateGraphViewportContent()
 			m = m.scrollToGraphSelection()
+			if len(m.GraphCommits) > 0 {
+				m.PendingDetailsHash = m.GraphCommits[m.GraphIdx].FullHash
+				return m, m.debounceDetailsCmd(m.GraphCommits[m.GraphIdx].FullHash)
+			}
 		}
 		return m, nil
 
@@ -36,6 +40,10 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.GraphIdx++
 			m = m.updateGraphViewportContent()
 			m = m.scrollToGraphSelection()
+			if len(m.GraphCommits) > 0 {
+				m.PendingDetailsHash = m.GraphCommits[m.GraphIdx].FullHash
+				return m, m.debounceDetailsCmd(m.GraphCommits[m.GraphIdx].FullHash)
+			}
 		}
 		return m, nil
 
@@ -44,6 +52,12 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			gc := m.GraphCommits[m.GraphIdx]
 			m.SelectedCommit = gc
 			if m.SelectedCommit.Hash != "" {
+				if len(gc.Files) == 0 && m.GitService != nil {
+					parentInfos, files, _ := m.GitService.GetCommitDetails(gc.FullHash)
+					m.GraphCommits[m.GraphIdx].ParentInfos = parentInfos
+					m.GraphCommits[m.GraphIdx].Files = files
+					m.SelectedCommit = m.GraphCommits[m.GraphIdx]
+				}
 				m.Screen = CommitDetailScreen
 				m.FileIdx = 0
 			}

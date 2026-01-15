@@ -60,6 +60,17 @@ func (m Model) updateDivergence(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+	case "y":
+		var hash string
+		if m.ActivePane == IncomingPane && len(m.Incoming) > 0 {
+			hash = m.Incoming[m.IncomingIdx].FullHash
+		} else if m.ActivePane == OutgoingPane && len(m.Outgoing) > 0 {
+			hash = m.Outgoing[m.OutgoingIdx].FullHash
+		}
+		if hash != "" {
+			copyToClipboard(hash)
+		}
+
 	case "esc":
 		m.Screen = GraphScreen
 	}

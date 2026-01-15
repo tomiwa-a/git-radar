@@ -351,3 +351,178 @@ func (s *Service) GetCommitDetails(fullHash string) ([]types.ParentInfo, []types
 
 	return parentInfos, files, nil
 }
+
+func (s *Service) resolveBranchHash(branch string) (plumbing.Hash, error) {
+	ref, err := s.repo.Reference(plumbing.NewBranchReferenceName(branch), true)
+	if err != nil {
+		ref, err = s.repo.Reference(plumbing.NewRemoteReferenceName("origin", branch), true)
+		if err != nil {
+			return plumbing.ZeroHash, err
+		}
+	}
+	return ref.Hash(), nil
+}
+
+func (s *Service) GetMergeBase(branch1, branch2 string) (*types.GraphCommit, error) {
+	hash1, err := s.resolveBranchHash(branch1)
+	if err != nil {
+		return nil, err
+	}
+	hash2, err := s.resolveBranchHash(branch2)
+	if err != nil {
+		return nil, err
+	}
+
+	commit1, err := s.repo.CommitObject(hash1)
+	if err != nil {
+		return nil, err
+	}
+	commit2, err := s.repo.CommitObject(hash2)
+	if err != nil {
+		return nil, err
+	}
+
+	bases, err := commit1.MergeBase(commit2)
+	if err != nil || len(bases) == 0 {
+		return nil, err
+	}
+
+	base := bases[0]
+	message := strings.Split(strings.TrimSpace(base.Message), "\n")[0]
+
+	return &types.GraphCommit{
+		Hash:     base.Hash.String()[:7],
+		FullHash: base.Hash.String(),
+		Message:  message,
+		Author:   base.Author.Name,
+		Date:     utils.FormatRelativeTime(base.Author.When),
+	}, nil
+}
+
+func (s *Service) GetIncomingCommits(target, source string) ([]types.GraphCommit, error) {
+	return s.getCommitsBetween(target, source)
+}
+
+func (s *Service) GetOutgoingCommits(target, source string) ([]types.GraphCommit, error) {
+	return s.getCommitsBetween(source, target)
+}
+
+func (s *Service) getCommitsBetween(branch1, branch2 string) ([]types.GraphCommit, error) {
+	hash1, err := s.resolveBranchHash(branch1)
+	if err != nil {
+		return nil, err
+	}
+	hash2, err := s.resolveBranchHash(branch2)
+	if err != nil {
+		return nil, err
+	}
+
+	commit2, err := s.repo.CommitObject(hash2)
+	if err != nil {
+		return nil, err
+	}
+
+	iter, err := s.repo.Log(&git.LogOptions{From: hash1})
+	if err != nil {
+		return nil, err
+	}
+
+	reachableFromBranch2 := make(map[string]bool)
+	iter2, _ := s.repo.Log(&git.LogOptions{From: hash2})
+	iter2.ForEach(func(c *object.Commit) error {
+		reachableFromBranch2[c.Hash.String()] = true
+		return nil
+	})
+	_ = commit2
+
+	var commits []types.GraphCommit
+	iter.ForEach(func(c *object.Commit) error {
+		if reachableFromBranch2[c.Hash.String()] {
+			return nil
+		}
+
+		message := strings.Split(strings.TrimSpace(c.Message), "\n")[0]
+		var parents []string
+		for _, p := range c.ParentHashes {
+			parents = append(parents, p.String())
+		}
+
+		commits = append(commits, types.GraphCommit{
+			Hash:     c.Hash.String()[:7],
+			FullHash: c.Hash.String(),
+			Message:  message,
+			Author:   c.Author.Name,
+			Date:     utils.FormatRelativeTime(c.Author.When),
+			Parents:  parents,
+			IsMerge:  len(parents) > 1,
+		})
+		return nil
+	})
+
+	return commits, nil
+}
+
+func (s *Service) GetBranchDiffStats(branch1, branch2 string) ([]types.FileChange, error) {
+	hash1, err := s.resolveBranchHash(branch1)
+	if err != nil {
+		return nil, err
+	}
+	hash2, err := s.resolveBranchHash(branch2)
+	if err != nil {
+		return nil, err
+	}
+
+	commit1, err := s.repo.CommitObject(hash1)
+	if err != nil {
+		return nil, err
+	}
+	commit2, err := s.repo.CommitObject(hash2)
+	if err != nil {
+		return nil, err
+	}
+
+	patch, err := commit2.Patch(commit1)
+	if err != nil {
+		return nil, err
+	}
+
+	var files []types.FileChange
+	for _, fp := range patch.FilePatches() {
+		from, to := fp.Files()
+		var name, status string
+		if to == nil && from != nil {
+			name = from.Path()
+			status = "D"
+		} else if from == nil && to != nil {
+			name = to.Path()
+			status = "A"
+		} else if to != nil {
+			name = to.Path()
+			status = "M"
+		}
+
+		adds, dels := 0, 0
+		for _, chunk := range fp.Chunks() {
+			content := chunk.Content()
+			lines := strings.Count(content, "\n")
+			if len(content) > 0 && content[len(content)-1] != '\n' {
+				lines++
+			}
+			switch chunk.Type() {
+			case diff.Add:
+				adds += lines
+			case diff.Delete:
+				dels += lines
+			}
+		}
+
+		files = append(files, types.FileChange{
+			Status:    status,
+			Path:      name,
+			Additions: adds,
+			Deletions: dels,
+		})
+	}
+
+	return files, nil
+}

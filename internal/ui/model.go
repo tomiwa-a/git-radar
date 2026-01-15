@@ -59,53 +59,59 @@ type DivergenceLoadedMsg struct {
 type ClearAlertMsg struct{}
 
 type Model struct {
-	Incoming           []types.GraphCommit
-	Outgoing           []types.GraphCommit
-	ActivePane         Pane
-	IncomingIdx        int
-	OutgoingIdx        int
-	Width              int
-	Height             int
-	TargetBranch       string
-	SourceBranch       string
-	Screen             Screen
-	PreviousScreen     Screen
-	SelectedCommit     types.GraphCommit
-	FileIdx            int
-	Viewport           viewport.Model
-	ViewportReady      bool
-	GraphCommits       []types.GraphCommit
-	GraphIdx           int
-	CurrentBranch      string
-	Branches           []types.Branch
-	ShowBranchModal    bool
-	BranchModalIdx     int
-	ShowCompareModal   bool
-	CompareModalIdx    int
-	ShowLegend         bool
-	GraphViewport      viewport.Model
-	GraphViewportReady bool
-	GitService         *git.Service
-	LoadingCommits     bool
-	LoadingDetails     bool
-	PendingDetailsHash string
-	LoadingDivergence  bool
-	MergeBase          *types.GraphCommit
-	TotalFiles         int
-	TotalAdditions     int
-	TotalDeletions     int
-	AlertMessage       string
-	ShowFilter         bool
-	FilterInput        textinput.Model
-	FilteredFiles      []types.FileChange
-	CompareLocalPane   viewport.Model
-	CompareRemotePane  viewport.Model
-	ActiveComparePane  ComparePane
-	LocalBranches      []types.Branch
-	RemoteBranches     []types.Branch
-	CompareFilterInput textinput.Model
-	FilteredLocal      []types.Branch
-	FilteredRemote     []types.Branch
+	Incoming             []types.GraphCommit
+	Outgoing             []types.GraphCommit
+	ActivePane           Pane
+	IncomingIdx          int
+	OutgoingIdx          int
+	Width                int
+	Height               int
+	TargetBranch         string
+	SourceBranch         string
+	Screen               Screen
+	PreviousScreen       Screen
+	SelectedCommit       types.GraphCommit
+	FileIdx              int
+	Viewport             viewport.Model
+	ViewportReady        bool
+	GraphCommits         []types.GraphCommit
+	GraphIdx             int
+	CurrentBranch        string
+	Branches             []types.Branch
+	ShowBranchModal      bool
+	BranchModalIdx       int
+	ShowCompareModal     bool
+	CompareModalIdx      int
+	ShowLegend           bool
+	GraphViewport        viewport.Model
+	GraphViewportReady   bool
+	GitService           *git.Service
+	LoadingCommits       bool
+	LoadingDetails       bool
+	PendingDetailsHash   string
+	LoadingDivergence    bool
+	MergeBase            *types.GraphCommit
+	TotalFiles           int
+	TotalAdditions       int
+	TotalDeletions       int
+	AlertMessage         string
+	ShowFilter           bool
+	FilterInput          textinput.Model
+	FilteredFiles        []types.FileChange
+	CompareLocalPane     viewport.Model
+	CompareRemotePane    viewport.Model
+	ActiveComparePane    ComparePane
+	LocalBranches        []types.Branch
+	RemoteBranches       []types.Branch
+	CompareFilterInput   textinput.Model
+	FilteredLocal        []types.Branch
+	FilteredRemote       []types.Branch
+	BranchLocalPane      viewport.Model
+	BranchRemotePane     viewport.Model
+	ActiveBranchPane     ComparePane // Reusing enum
+	BranchFilterInput    textinput.Model
+	BranchFilteredLocal  []types.Branch
+	BranchFilteredRemote []types.Branch
 }
 
 func InitialModel() Model {
@@ -139,6 +145,7 @@ func InitialModel() Model {
 		FilteredFiles:      nil,
 		ActiveComparePane:  LocalComparePane,
 		CompareFilterInput: textinput.New(),
+		BranchFilterInput:  textinput.New(),
 	}
 }
 
@@ -222,12 +229,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "b" {
 			m.ShowBranchModal = true
 			m.BranchModalIdx = 0
-			for i, branch := range m.Branches {
-				if branch.Name == m.CurrentBranch {
-					m.BranchModalIdx = i
-					break
+			m.ActiveBranchPane = LocalComparePane // Use Local as default
+			m.BranchFilterInput.SetValue("")
+			m.BranchFilterInput.Focus()
+
+			// Split branches
+			m.LocalBranches = nil
+			m.RemoteBranches = nil
+			for _, b := range m.Branches {
+				if b.IsRemote {
+					m.RemoteBranches = append(m.RemoteBranches, b)
+				} else {
+					m.LocalBranches = append(m.LocalBranches, b)
 				}
 			}
+			m.BranchFilteredLocal = m.LocalBranches
+			m.BranchFilteredRemote = m.RemoteBranches
+
+			// Initialize viewports
+			m = m.initBranchViewports()
 			return m, nil
 		}
 

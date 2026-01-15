@@ -31,22 +31,55 @@ func getDummyDivergenceCommits() dummyDivergence {
 
 func (m Model) updateBranchModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "esc", "b":
+	case "esc":
 		m.ShowBranchModal = false
+		return m, nil
+
+	case "tab", "right", "l":
+		if m.ActiveBranchPane == LocalComparePane {
+			m.ActiveBranchPane = RemoteComparePane
+			m.BranchModalIdx = 0
+		} else {
+			m.ActiveBranchPane = LocalComparePane
+			m.BranchModalIdx = 0
+		}
+		return m.updateBranchViewportContent(), nil
+
+	case "left", "h":
+		if m.ActiveBranchPane == RemoteComparePane {
+			m.ActiveBranchPane = LocalComparePane
+			m.BranchModalIdx = 0
+		} else {
+			m.ActiveBranchPane = RemoteComparePane
+			m.BranchModalIdx = 0
+		}
+		return m.updateBranchViewportContent(), nil
 
 	case "up", "k":
 		if m.BranchModalIdx > 0 {
 			m.BranchModalIdx--
+			m = m.updateBranchViewportContent()
 		}
+		return m, nil
 
 	case "down", "j":
-		if m.BranchModalIdx < len(m.Branches)-1 {
-			m.BranchModalIdx++
+		activeList := m.BranchFilteredLocal
+		if m.ActiveBranchPane == RemoteComparePane {
+			activeList = m.BranchFilteredRemote
 		}
+		if m.BranchModalIdx < len(activeList)-1 {
+			m.BranchModalIdx++
+			m = m.updateBranchViewportContent()
+		}
+		return m, nil
 
 	case "enter":
-		if len(m.Branches) > 0 {
-			m.CurrentBranch = m.Branches[m.BranchModalIdx].Name
+		activeList := m.BranchFilteredLocal
+		if m.ActiveBranchPane == RemoteComparePane {
+			activeList = m.BranchFilteredRemote
+		}
+		if len(activeList) > 0 && m.BranchModalIdx < len(activeList) {
+			m.CurrentBranch = activeList[m.BranchModalIdx].Name
 			m.ShowBranchModal = false
 			if m.Screen == DivergenceScreen {
 				m.SourceBranch = m.CurrentBranch
@@ -63,7 +96,37 @@ func (m Model) updateBranchModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.loadCommitsCmd(m.CurrentBranch, 100)
 		}
 	}
-	return m, nil
+
+	var cmd tea.Cmd
+	m.BranchFilterInput, cmd = m.BranchFilterInput.Update(msg)
+
+	// Update filtering
+	query := strings.ToLower(m.BranchFilterInput.Value())
+
+	m.BranchFilteredLocal = nil
+	for _, b := range m.LocalBranches {
+		if strings.Contains(strings.ToLower(b.Name), query) {
+			m.BranchFilteredLocal = append(m.BranchFilteredLocal, b)
+		}
+	}
+
+	m.BranchFilteredRemote = nil
+	for _, b := range m.RemoteBranches {
+		if strings.Contains(strings.ToLower(b.Name), query) {
+			m.BranchFilteredRemote = append(m.BranchFilteredRemote, b)
+		}
+	}
+
+	// Reset index if it's out of bounds
+	activeList := m.BranchFilteredLocal
+	if m.ActiveBranchPane == RemoteComparePane {
+		activeList = m.BranchFilteredRemote
+	}
+	if m.BranchModalIdx >= len(activeList) {
+		m.BranchModalIdx = 0
+	}
+
+	return m.updateBranchViewportContent(), cmd
 }
 
 func (m Model) updateCompareModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

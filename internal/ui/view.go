@@ -50,7 +50,9 @@ func (m Model) View() string {
 	}
 
 	if m.ShowBranchModal {
-		modal := screens.RenderBranchModal(m.Width, m.Height, m.Branches, m.BranchModalIdx, m.CurrentBranch)
+		localView := m.BranchLocalPane.View()
+		remoteView := m.BranchRemotePane.View()
+		modal := screens.RenderBranchModal(m.Width, m.Height, localView, remoteView, m.BranchFilterInput.Value(), int(m.ActiveBranchPane))
 		return modal
 	}
 

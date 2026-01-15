@@ -214,3 +214,55 @@ func (m Model) scrollToCompareSelection() Model {
 	}
 	return m
 }
+
+func (m Model) initBranchViewports() Model {
+	modalWidth := int(float64(m.Width) * 0.8)
+	modalHeight := int(float64(m.Height) * 0.7)
+	paneWidth := (modalWidth - 6) / 2
+	paneHeight := modalHeight - 7
+
+	m.BranchLocalPane = viewport.New(paneWidth, paneHeight)
+	m.BranchRemotePane = viewport.New(paneWidth, paneHeight)
+
+	return m.updateBranchViewportContent()
+}
+
+func (m Model) updateBranchViewportContent() Model {
+	modalWidth := int(float64(m.Width) * 0.8)
+	paneWidth := (modalWidth - 6) / 2
+
+	m = m.scrollToBranchSelection()
+
+	localContent := screens.RenderBranchListContent(paneWidth, m.BranchFilteredLocal, m.BranchModalIdx, m.ActiveBranchPane == LocalComparePane)
+	m.BranchLocalPane.SetContent(localContent)
+
+	remoteContent := screens.RenderBranchListContent(paneWidth, m.BranchFilteredRemote, m.BranchModalIdx, m.ActiveBranchPane == RemoteComparePane)
+	m.BranchRemotePane.SetContent(remoteContent)
+
+	return m
+}
+
+func (m Model) scrollToBranchSelection() Model {
+	if m.ActiveBranchPane == LocalComparePane {
+		selectedLine := m.BranchModalIdx
+		viewportHeight := m.BranchLocalPane.Height
+		currentTop := m.BranchLocalPane.YOffset
+
+		if selectedLine < currentTop {
+			m.BranchLocalPane.SetYOffset(selectedLine)
+		} else if selectedLine >= currentTop+viewportHeight {
+			m.BranchLocalPane.SetYOffset(selectedLine - viewportHeight + 1)
+		}
+	} else {
+		selectedLine := m.BranchModalIdx
+		viewportHeight := m.BranchRemotePane.Height
+		currentTop := m.BranchRemotePane.YOffset
+
+		if selectedLine < currentTop {
+			m.BranchRemotePane.SetYOffset(selectedLine)
+		} else if selectedLine >= currentTop+viewportHeight {
+			m.BranchRemotePane.SetYOffset(selectedLine - viewportHeight + 1)
+		}
+	}
+	return m
+}

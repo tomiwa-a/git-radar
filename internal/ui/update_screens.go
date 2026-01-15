@@ -39,15 +39,25 @@ func (m Model) updateDivergence(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.ActivePane = IncomingPane
 		}
 
+	case "c":
+		m.ShowCompareModal = true
+		m.CompareModalIdx = 0
+
 	case "enter":
+		var commit types.GraphCommit
 		if m.ActivePane == IncomingPane && len(m.Incoming) > 0 {
-			m.SelectedCommit = m.Incoming[m.IncomingIdx]
+			commit = m.Incoming[m.IncomingIdx]
 		} else if m.ActivePane == OutgoingPane && len(m.Outgoing) > 0 {
-			m.SelectedCommit = m.Outgoing[m.OutgoingIdx]
+			commit = m.Outgoing[m.OutgoingIdx]
 		}
-		if m.SelectedCommit.Hash != "" {
+		if commit.Hash != "" {
+			m.SelectedCommit = commit
 			m.Screen = CommitDetailScreen
 			m.FileIdx = 0
+			if len(commit.Files) == 0 && m.GitService != nil {
+				m.LoadingDetails = true
+				return m, m.loadDetailsCmd(commit.FullHash)
+			}
 		}
 
 	case "esc":

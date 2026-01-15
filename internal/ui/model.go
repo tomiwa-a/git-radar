@@ -148,6 +148,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 		}
+		if m.SelectedCommit.FullHash == msg.FullHash {
+			m.SelectedCommit.ParentInfos = msg.ParentInfos
+			m.SelectedCommit.Files = msg.Files
+		}
 		m.LoadingDetails = false
 		return m, nil
 

@@ -79,6 +79,8 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !m.ShowLegend && len(m.GraphCommits) > 0 {
 			hash := m.GraphCommits[m.GraphIdx].FullHash
 			copyToClipboard(hash)
+			m.AlertMessage = "Hash copied!"
+			return m, clearAlertCmd()
 		}
 
 	case "pgup", "pgdown", "home", "end":

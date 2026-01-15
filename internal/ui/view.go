@@ -14,7 +14,7 @@ func (m Model) View() string {
 		if m.GraphViewportReady {
 			viewportContent = m.GraphViewport.View()
 		}
-		baseView = screens.RenderGraphWithLegend(m.Width, m.Height, m.GraphCommits, m.GraphIdx, m.CurrentBranch, m.ShowLegend, viewportContent, m.LoadingCommits)
+		baseView = screens.RenderGraphWithLegend(m.Width, m.Height, m.GraphCommits, m.GraphIdx, m.CurrentBranch, m.ShowLegend, viewportContent, m.LoadingCommits, m.AlertMessage)
 	case CommitDetailScreen:
 		baseView = screens.RenderFileList(m.Width, m.SelectedCommit, m.FileIdx)
 	case DiffViewScreen:
@@ -34,10 +34,11 @@ func (m Model) View() string {
 			TotalDeletions:    m.TotalDeletions,
 			ConflictFiles:     nil,
 			LoadingDivergence: m.LoadingDivergence,
+			AlertMessage:      m.AlertMessage,
 		}
 		baseView = screens.RenderDivergence(m.Width, m.Height, data)
 	default:
-		baseView = screens.RenderGraph(m.Width, m.GraphCommits, m.GraphIdx, m.CurrentBranch)
+		baseView = screens.RenderGraph(m.Width, m.GraphCommits, m.GraphIdx, m.CurrentBranch, m.AlertMessage)
 	}
 
 	if m.ShowBranchModal {

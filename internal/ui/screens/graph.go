@@ -27,11 +27,11 @@ var (
 	branchCountStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFB86C"))
 )
 
-func RenderGraph(width int, commits []types.GraphCommit, selectedIdx int, currentBranch string) string {
-	return RenderGraphWithLegend(width, 24, commits, selectedIdx, currentBranch, false, "", false)
+func RenderGraph(width int, commits []types.GraphCommit, selectedIdx int, currentBranch string, alertMessage string) string {
+	return RenderGraphWithLegend(width, 24, commits, selectedIdx, currentBranch, false, "", false, alertMessage)
 }
 
-func RenderGraphWithLegend(width, height int, commits []types.GraphCommit, selectedIdx int, currentBranch string, showLegend bool, viewportContent string, loading bool) string {
+func RenderGraphWithLegend(width, height int, commits []types.GraphCommit, selectedIdx int, currentBranch string, showLegend bool, viewportContent string, loading bool, alertMessage string) string {
 	if showLegend {
 		return utils.RenderLegend(
 			width, height,
@@ -51,6 +51,13 @@ func RenderGraphWithLegend(width, height int, commits []types.GraphCommit, selec
 	if headerGap < 0 {
 		headerGap = 0
 	}
+
+	// Change title to alert message if one exists
+	if alertMessage != "" {
+		alertStyle := lipgloss.NewStyle().Background(lipgloss.Color("#50FA7B")).Foreground(lipgloss.Color("#282A36")).Bold(true).Padding(0, 1)
+		title = alertStyle.Render(" " + alertMessage + " ")
+	}
+
 	header := title + strings.Repeat(" ", headerGap/2) + branchLabel + branchName + strings.Repeat(" ", headerGap/2) + help
 	b.WriteString(header + "\n")
 

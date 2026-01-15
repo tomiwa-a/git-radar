@@ -64,6 +64,7 @@ type DivergenceData struct {
 	TotalDeletions    int
 	ConflictFiles     []string
 	LoadingDivergence bool
+	AlertMessage      string
 }
 
 func GetDummyDivergenceData() DivergenceData {
@@ -108,16 +109,31 @@ func RenderDivergence(width, height int, data DivergenceData) string {
 	if headerGap < 0 {
 		headerGap = 0
 	}
-	b.WriteString(title + strings.Repeat(" ", headerGap) + compareLabel + "\n")
-	b.WriteString(divDimStyle.Render(strings.Repeat("─", width-2)) + "\n\n")
 
 	if data.LoadingDivergence {
+		// Change title to alert message if one exists even during loading
+		if data.AlertMessage != "" {
+			alertStyle := lipgloss.NewStyle().Background(lipgloss.Color("#50FA7B")).Foreground(lipgloss.Color("#282A36")).Bold(true).Padding(0, 1)
+			title = alertStyle.Render(" " + data.AlertMessage + " ")
+		}
+		b.WriteString(title + strings.Repeat(" ", headerGap) + compareLabel + "\n")
+		b.WriteString(divDimStyle.Render(strings.Repeat("─", width-2)) + "\n\n")
+
 		loadingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFB86C")).Bold(true)
 		b.WriteString("\n\n" + loadingStyle.Render("  Loading divergence data...") + "\n\n")
 		help := divDimStyle.Render("y: copy hash │ esc: back │ q: quit")
 		b.WriteString(help)
 		return b.String()
 	}
+
+	// Change title to alert message if one exists
+	if data.AlertMessage != "" {
+		alertStyle := lipgloss.NewStyle().Background(lipgloss.Color("#50FA7B")).Foreground(lipgloss.Color("#282A36")).Bold(true).Padding(0, 1)
+		title = alertStyle.Render(" " + data.AlertMessage + " ")
+	}
+
+	b.WriteString(title + strings.Repeat(" ", headerGap) + compareLabel + "\n")
+	b.WriteString(divDimStyle.Render(strings.Repeat("─", width-2)) + "\n\n")
 
 	b.WriteString(renderDivergedAt(width, data.MergeBase))
 	b.WriteString("\n")

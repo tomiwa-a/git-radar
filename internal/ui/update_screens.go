@@ -69,6 +69,8 @@ func (m Model) updateDivergence(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if hash != "" {
 			copyToClipboard(hash)
+			m.AlertMessage = "Hash copied!"
+			return m, clearAlertCmd()
 		}
 
 	case "esc":

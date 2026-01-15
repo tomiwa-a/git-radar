@@ -71,7 +71,7 @@ func (m Model) updateCompareModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "enter":
-		if len(comparableBranches) > 0 {
+		if len(comparableBranches) > 0 && m.GitService != nil {
 			m.TargetBranch = comparableBranches[m.CompareModalIdx]
 			m.SourceBranch = m.CurrentBranch
 			m.ShowCompareModal = false
@@ -79,9 +79,11 @@ func (m Model) updateCompareModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.IncomingIdx = 0
 			m.OutgoingIdx = 0
 			m.ActivePane = OutgoingPane
-			dummyData := getDummyDivergenceCommits()
-			m.Incoming = dummyData.Incoming
-			m.Outgoing = dummyData.Outgoing
+			m.LoadingDivergence = true
+			m.Incoming = nil
+			m.Outgoing = nil
+			m.MergeBase = nil
+			return m, m.loadDivergenceCmd(m.TargetBranch, m.SourceBranch)
 		}
 	}
 	return m, nil

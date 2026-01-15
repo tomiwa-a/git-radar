@@ -51,18 +51,19 @@ var (
 )
 
 type DivergenceData struct {
-	TargetBranch   string
-	SourceBranch   string
-	MergeBase      *types.GraphCommit
-	Incoming       []types.GraphCommit
-	Outgoing       []types.GraphCommit
-	IncomingIdx    int
-	OutgoingIdx    int
-	ActivePane     int
-	TotalFiles     int
-	TotalAdditions int
-	TotalDeletions int
-	ConflictFiles  []string
+	TargetBranch      string
+	SourceBranch      string
+	MergeBase         *types.GraphCommit
+	Incoming          []types.GraphCommit
+	Outgoing          []types.GraphCommit
+	IncomingIdx       int
+	OutgoingIdx       int
+	ActivePane        int
+	TotalFiles        int
+	TotalAdditions    int
+	TotalDeletions    int
+	ConflictFiles     []string
+	LoadingDivergence bool
 }
 
 func GetDummyDivergenceData() DivergenceData {
@@ -110,6 +111,14 @@ func RenderDivergence(width, height int, data DivergenceData) string {
 	b.WriteString(title + strings.Repeat(" ", headerGap) + compareLabel + "\n")
 	b.WriteString(divDimStyle.Render(strings.Repeat("─", width-2)) + "\n\n")
 
+	if data.LoadingDivergence {
+		loadingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFB86C")).Bold(true)
+		b.WriteString("\n\n" + loadingStyle.Render("  Loading divergence data...") + "\n\n")
+		help := divDimStyle.Render("esc: back │ q: quit")
+		b.WriteString(help)
+		return b.String()
+	}
+
 	b.WriteString(renderDivergedAt(width, data.MergeBase))
 	b.WriteString("\n")
 
@@ -122,7 +131,7 @@ func RenderDivergence(width, height int, data DivergenceData) string {
 	b.WriteString(renderTotalChanges(width, data))
 	b.WriteString("\n")
 
-	help := divDimStyle.Render("←/→: switch pane │ ↑/↓: navigate │ enter: view diff │ esc: back │ q: quit")
+	help := divDimStyle.Render("←/→: switch pane │ ↑/↓: navigate │ enter: view diff │ b: change source │ c: change target │ esc: back │ q: quit")
 	b.WriteString(help)
 
 	return b.String()

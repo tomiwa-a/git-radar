@@ -39,6 +39,12 @@ type DebounceTickMsg struct {
 	FullHash string
 }
 
+type DivergenceLoadedMsg struct {
+	MergeBase *types.GraphCommit
+	Incoming  []types.GraphCommit
+	Outgoing  []types.GraphCommit
+}
+
 type Model struct {
 	Incoming           []types.GraphCommit
 	Outgoing           []types.GraphCommit
@@ -69,6 +75,8 @@ type Model struct {
 	LoadingCommits     bool
 	LoadingDetails     bool
 	PendingDetailsHash string
+	LoadingDivergence  bool
+	MergeBase          *types.GraphCommit
 }
 
 func InitialModel() Model {
@@ -141,6 +149,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.LoadingDetails = false
+		return m, nil
+
+	case DivergenceLoadedMsg:
+		m.MergeBase = msg.MergeBase
+		m.Incoming = msg.Incoming
+		m.Outgoing = msg.Outgoing
+		m.LoadingDivergence = false
+		m.IncomingIdx = 0
+		m.OutgoingIdx = 0
 		return m, nil
 
 	case tea.KeyMsg:
@@ -232,6 +249,19 @@ func (m Model) loadDetailsCmd(fullHash string) tea.Cmd {
 			FullHash:    fullHash,
 			ParentInfos: parentInfos,
 			Files:       files,
+		}
+	})
+}
+
+func (m Model) loadDivergenceCmd(target, source string) tea.Cmd {
+	return tea.Cmd(func() tea.Msg {
+		mergeBase, _ := m.GitService.GetMergeBase(target, source)
+		incoming, _ := m.GitService.GetIncomingCommits(target, source)
+		outgoing, _ := m.GitService.GetOutgoingCommits(target, source)
+		return DivergenceLoadedMsg{
+			MergeBase: mergeBase,
+			Incoming:  incoming,
+			Outgoing:  outgoing,
 		}
 	})
 }

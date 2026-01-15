@@ -14,7 +14,8 @@ func (m Model) View() string {
 		if m.GraphViewportReady {
 			viewportContent = m.GraphViewport.View()
 		}
-		baseView = screens.RenderGraphWithLegend(m.Width, m.Height, m.GraphCommits, m.GraphIdx, m.CurrentBranch, m.ShowLegend, viewportContent, m.LoadingCommits, m.AlertMessage)
+		isLoading := m.LoadingBranches || m.LoadingCommits
+		baseView = screens.RenderGraphWithLegend(m.Width, m.Height, m.GraphCommits, m.GraphIdx, m.CurrentBranch, m.ShowLegend, viewportContent, isLoading, m.AlertMessage)
 	case CommitDetailScreen:
 		displayFiles := m.SelectedCommit.Files
 		if m.ShowFilter {

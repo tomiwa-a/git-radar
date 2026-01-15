@@ -1,6 +1,7 @@
 package git
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 
@@ -353,14 +354,41 @@ func (s *Service) GetCommitDetails(fullHash string) ([]types.ParentInfo, []types
 }
 
 func (s *Service) resolveBranchHash(branch string) (plumbing.Hash, error) {
-	ref, err := s.repo.Reference(plumbing.NewBranchReferenceName(branch), true)
-	if err != nil {
-		ref, err = s.repo.Reference(plumbing.NewRemoteReferenceName("origin", branch), true)
-		if err != nil {
-			return plumbing.ZeroHash, err
+	if branch == "" {
+		return plumbing.ZeroHash, fmt.Errorf("branch name is empty")
+	}
+
+	// 1. Try exact match (could be full ref or hash)
+	ref, err := s.repo.Reference(plumbing.ReferenceName(branch), true)
+	if err == nil {
+		return ref.Hash(), nil
+	}
+
+	// 2. Try as local branch
+	ref, err = s.repo.Reference(plumbing.NewBranchReferenceName(branch), true)
+	if err == nil {
+		return ref.Hash(), nil
+	}
+
+	// 3. Handle origin/ prefix
+	if strings.HasPrefix(branch, "origin/") {
+		shortName := branch[len("origin/"):]
+		ref, err = s.repo.Reference(plumbing.NewRemoteReferenceName("origin", shortName), true)
+		if err == nil {
+			return ref.Hash(), nil
 		}
 	}
-	return ref.Hash(), nil
+
+	// 4. Try as remote branch (implied origin)
+	ref, err = s.repo.Reference(plumbing.NewRemoteReferenceName("origin", branch), true)
+	if err == nil {
+		return ref.Hash(), nil
+	}
+
+	// 5. Try resolving as a short hash or tag maybe?
+	// But let's stick to branches for now as per requirements.
+
+	return plumbing.ZeroHash, fmt.Errorf("could not resolve branch: %s", branch)
 }
 
 func (s *Service) GetMergeBase(branch1, branch2 string) (*types.GraphCommit, error) {

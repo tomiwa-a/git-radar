@@ -97,18 +97,19 @@ func (m Model) updateCommitDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "/":
 			m.ShowFilter = false
 			return m, nil
-		case "up", "k":
+		case "up":
 			if m.FileIdx > 0 {
 				m.FileIdx--
 			}
 			return m, nil
-		case "down", "j":
+		case "down":
 			if len(m.FilteredFiles) > 0 && m.FileIdx < len(m.FilteredFiles)-1 {
 				m.FileIdx++
 			}
 			return m, nil
 		case "enter":
 			if len(m.FilteredFiles) > 0 {
+				m.Screen = DiffViewScreen
 				m = m.initViewport()
 			}
 			return m, nil
@@ -123,12 +124,22 @@ func (m Model) updateCommitDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.FilteredFiles = m.SelectedCommit.Files
 		} else {
 			var filtered []types.FileChange
-			isExt := strings.HasPrefix(query, ".")
+			isExtSearch := strings.HasPrefix(query, ".") && len(query) > 1
+			extQuery := ""
+			if isExtSearch {
+				extQuery = query[1:]
+			}
+
 			for _, f := range m.SelectedCommit.Files {
 				path := strings.ToLower(f.Path)
-				if isExt {
-					if strings.HasSuffix(path, query) {
-						filtered = append(filtered, f)
+				if isExtSearch {
+					// Extract extension
+					lastDot := strings.LastIndex(path, ".")
+					if lastDot != -1 && lastDot < len(path)-1 {
+						fileExt := path[lastDot+1:]
+						if strings.HasPrefix(fileExt, extQuery) {
+							filtered = append(filtered, f)
+						}
 					}
 				} else {
 					if strings.Contains(path, query) {

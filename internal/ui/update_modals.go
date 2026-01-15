@@ -46,6 +46,17 @@ func (m Model) updateBranchModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.Branches) > 0 {
 			m.CurrentBranch = m.Branches[m.BranchModalIdx].Name
 			m.ShowBranchModal = false
+			if m.Screen == DivergenceScreen {
+				m.SourceBranch = m.CurrentBranch
+				m.LoadingDivergence = true
+				m.Incoming = nil
+				m.Outgoing = nil
+				m.MergeBase = nil
+				return m, tea.Batch(
+					m.loadCommitsCmd(m.CurrentBranch, 100),
+					m.loadDivergenceCmd(m.TargetBranch, m.SourceBranch),
+				)
+			}
 			m.LoadingCommits = true
 			return m, m.loadCommitsCmd(m.CurrentBranch, 100)
 		}

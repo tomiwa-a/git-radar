@@ -20,13 +20,8 @@ func (m Model) View() string {
 	case DiffViewScreen:
 		baseView = screens.RenderDiffs(m.Width, m.SelectedCommit, m.FileIdx, m.Viewport.View())
 	case DivergenceScreen:
-		baseView = screens.RenderDashboard(
-			m.Width,
-			m.TargetBranch, m.SourceBranch,
-			m.Incoming, m.Outgoing,
-			m.IncomingIdx, m.OutgoingIdx,
-			int(m.ActivePane),
-		)
+		data := screens.GetDummyDivergenceData()
+		baseView = screens.RenderDivergence(m.Width, m.Height, data)
 	default:
 		baseView = screens.RenderGraph(m.Width, m.GraphCommits, m.GraphIdx, m.CurrentBranch)
 	}

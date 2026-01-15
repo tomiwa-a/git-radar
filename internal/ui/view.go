@@ -22,7 +22,11 @@ func (m Model) View() string {
 		}
 		baseView = screens.RenderFileList(m.Width, m.Height, m.SelectedCommit, displayFiles, m.FileIdx, m.ShowFilter, m.FilterInput.Value())
 	case DiffViewScreen:
-		baseView = screens.RenderDiffs(m.Width, m.SelectedCommit, m.FileIdx, m.Viewport.View())
+		displayFiles := m.SelectedCommit.Files
+		if m.ShowFilter {
+			displayFiles = m.FilteredFiles
+		}
+		baseView = screens.RenderDiffs(m.Width, m.SelectedCommit, displayFiles, m.FileIdx, m.Viewport.View(), m.ShowFilter)
 	case DivergenceScreen:
 		data := screens.DivergenceData{
 			TargetBranch:      m.TargetBranch,

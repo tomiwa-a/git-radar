@@ -9,20 +9,33 @@ import (
 	"github.com/tomiwa-a/git-radar/utils"
 )
 
-func RenderDiffs(width int, commit types.GraphCommit, fileIdx int, viewportContent string) string {
+func RenderDiffs(width int, commit types.GraphCommit, files []types.FileChange, fileIdx int, viewportContent string, showFilter bool) string {
 	var b strings.Builder
 
-	file := commit.Files[fileIdx]
+	file := files[fileIdx]
 
 	backHint := utils.DetailsLabelStyle.Render("ESC: back  h/l: switch files  ↑↓: scroll")
+
+	filterIndicator := ""
+	if showFilter {
+		filterIndicator = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#FF79C6")).
+			Bold(true).
+			Render("[FILTERED] ")
+	}
+
+	indexIndicator := utils.DetailsLabelStyle.Render(fmt.Sprintf("%d of %d", fileIdx+1, len(files)))
 	fileName := utils.FileNameStyle.Render(file.Path)
 	stats := renderFileStats(file)
 
 	headerLine := lipgloss.JoinHorizontal(
 		lipgloss.Center,
+		filterIndicator,
 		fileName,
 		"  ",
 		stats,
+		"  ",
+		indexIndicator,
 	)
 
 	headerGap := width - lipgloss.Width(headerLine) - lipgloss.Width(backHint)

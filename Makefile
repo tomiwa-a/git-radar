@@ -16,6 +16,9 @@ build-all: clean
 
 install: build
 	sudo cp build/git-radar /usr/local/bin/
+	@if [ "$(shell uname)" = "Darwin" ]; then \
+		sudo codesign -s - /usr/local/bin/git-radar; \
+	fi
 	@echo "git-radar installed to /usr/local/bin/"
 
 clean:

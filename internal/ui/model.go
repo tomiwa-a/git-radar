@@ -33,6 +33,12 @@ const (
 	DiffViewScreen
 )
 
+type BranchesLoadedMsg struct {
+	Branches      []types.Branch
+	CurrentBranch string
+	GitService    *git.Service
+}
+
 type CommitsLoadedMsg struct {
 	Commits []types.GraphCommit
 }
@@ -86,6 +92,8 @@ type Model struct {
 	GraphViewport        viewport.Model
 	GraphViewportReady   bool
 	GitService           *git.Service
+	RepoPath             string
+	LoadingBranches      bool
 	LoadingCommits       bool
 	LoadingDetails       bool
 	PendingDetailsHash   string
@@ -114,8 +122,9 @@ type Model struct {
 	BranchFilteredRemote []types.Branch
 }
 
-func InitialModel() Model {
+func InitialModel(repoPath string) Model {
 	return Model{
+		RepoPath:           repoPath,
 		GraphCommits:       []types.GraphCommit{},
 		Branches:           nil,
 		CurrentBranch:      "",
@@ -138,7 +147,8 @@ func InitialModel() Model {
 		ShowLegend:         false,
 		GraphViewportReady: false,
 		GitService:         nil,
-		LoadingCommits:     false,
+		LoadingBranches:    true,
+		LoadingCommits:     true,
 		LoadingDetails:     false,
 		ShowFilter:         false,
 		FilterInput:        textinput.New(),
@@ -150,7 +160,28 @@ func InitialModel() Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return textinput.Blink
+	return tea.Batch(
+		textinput.Blink,
+		m.loadInitialDataCmd(),
+	)
+}
+
+func (m Model) loadInitialDataCmd() tea.Cmd {
+	return func() tea.Msg {
+		service, err := git.NewService(m.RepoPath)
+		if err != nil {
+			return nil
+		}
+
+		branches, _ := service.GetBranches()
+		current, _ := service.GetCurrentBranch()
+
+		return BranchesLoadedMsg{
+			Branches:      branches,
+			CurrentBranch: current,
+			GitService:    service,
+		}
+	}
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -162,6 +193,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m = m.initGraphViewport()
 		}
 		return m, nil
+
+	case BranchesLoadedMsg:
+		m.Branches = msg.Branches
+		m.CurrentBranch = msg.CurrentBranch
+		m.GitService = msg.GitService
+		m.LoadingBranches = false
+		return m, m.loadCommitsCmd(m.CurrentBranch, 100)
 
 	case CommitsLoadedMsg:
 		m.GraphCommits = msg.Commits

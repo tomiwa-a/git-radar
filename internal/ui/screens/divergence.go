@@ -114,7 +114,7 @@ func RenderDivergence(width, height int, data DivergenceData) string {
 	if data.LoadingDivergence {
 		loadingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFB86C")).Bold(true)
 		b.WriteString("\n\n" + loadingStyle.Render("  Loading divergence data...") + "\n\n")
-		help := divDimStyle.Render("esc: back │ q: quit")
+		help := divDimStyle.Render("y: copy hash │ esc: back │ q: quit")
 		b.WriteString(help)
 		return b.String()
 	}
@@ -131,7 +131,7 @@ func RenderDivergence(width, height int, data DivergenceData) string {
 	b.WriteString(renderTotalChanges(width, data))
 	b.WriteString("\n")
 
-	help := divDimStyle.Render("←/→: switch pane │ ↑/↓: navigate │ enter: view diff │ b: change source │ c: change target │ esc: back │ q: quit")
+	help := divDimStyle.Render("←/→: switch pane │ ↑/↓: navigate │ enter: view diff │ y: copy hash │ b: change source │ c: change target │ esc: back │ q: quit")
 	b.WriteString(help)
 
 	return b.String()

@@ -109,7 +109,7 @@ func RenderGraphWithLegend(width, height int, commits []types.GraphCommit, selec
 	}
 
 	// Footer
-	footer := utils.DetailsLabelStyle.Render("↑/↓: navigate │ enter: view files │ b: branches │ c: compare │ ?: help │ q: quit")
+	footer := utils.DetailsLabelStyle.Render("↑/↓: navigate │ enter: view files │ y: copy hash │ b: branches │ c: compare │ ?: help │ q: quit")
 	b.WriteString(footer)
 
 	return b.String()

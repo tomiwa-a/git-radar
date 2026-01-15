@@ -40,9 +40,12 @@ type DebounceTickMsg struct {
 }
 
 type DivergenceLoadedMsg struct {
-	MergeBase *types.GraphCommit
-	Incoming  []types.GraphCommit
-	Outgoing  []types.GraphCommit
+	MergeBase      *types.GraphCommit
+	Incoming       []types.GraphCommit
+	Outgoing       []types.GraphCommit
+	TotalFiles     int
+	TotalAdditions int
+	TotalDeletions int
 }
 
 type Model struct {
@@ -77,6 +80,9 @@ type Model struct {
 	PendingDetailsHash string
 	LoadingDivergence  bool
 	MergeBase          *types.GraphCommit
+	TotalFiles         int
+	TotalAdditions     int
+	TotalDeletions     int
 }
 
 func InitialModel() Model {
@@ -159,6 +165,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.MergeBase = msg.MergeBase
 		m.Incoming = msg.Incoming
 		m.Outgoing = msg.Outgoing
+		m.TotalFiles = msg.TotalFiles
+		m.TotalAdditions = msg.TotalAdditions
+		m.TotalDeletions = msg.TotalDeletions
 		m.LoadingDivergence = false
 		m.IncomingIdx = 0
 		m.OutgoingIdx = 0
@@ -262,10 +271,22 @@ func (m Model) loadDivergenceCmd(target, source string) tea.Cmd {
 		mergeBase, _ := m.GitService.GetMergeBase(target, source)
 		incoming, _ := m.GitService.GetIncomingCommits(target, source)
 		outgoing, _ := m.GitService.GetOutgoingCommits(target, source)
+
+		diffStats, _ := m.GitService.GetBranchDiffStats(source, target)
+		totalFiles := len(diffStats)
+		totalAdds, totalDels := 0, 0
+		for _, f := range diffStats {
+			totalAdds += f.Additions
+			totalDels += f.Deletions
+		}
+
 		return DivergenceLoadedMsg{
-			MergeBase: mergeBase,
-			Incoming:  incoming,
-			Outgoing:  outgoing,
+			MergeBase:      mergeBase,
+			Incoming:       incoming,
+			Outgoing:       outgoing,
+			TotalFiles:     totalFiles,
+			TotalAdditions: totalAdds,
+			TotalDeletions: totalDels,
 		}
 	})
 }

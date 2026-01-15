@@ -29,9 +29,9 @@ func (m Model) View() string {
 			IncomingIdx:       m.IncomingIdx,
 			OutgoingIdx:       m.OutgoingIdx,
 			ActivePane:        int(m.ActivePane),
-			TotalFiles:        0,
-			TotalAdditions:    0,
-			TotalDeletions:    0,
+			TotalFiles:        m.TotalFiles,
+			TotalAdditions:    m.TotalAdditions,
+			TotalDeletions:    m.TotalDeletions,
 			ConflictFiles:     nil,
 			LoadingDivergence: m.LoadingDivergence,
 		}

@@ -61,6 +61,7 @@ type Model struct {
 	TargetBranch       string
 	SourceBranch       string
 	Screen             Screen
+	PreviousScreen     Screen
 	SelectedCommit     types.GraphCommit
 	FileIdx            int
 	Viewport           viewport.Model

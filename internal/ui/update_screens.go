@@ -52,6 +52,7 @@ func (m Model) updateDivergence(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if commit.Hash != "" {
 			m.SelectedCommit = commit
+			m.PreviousScreen = m.Screen
 			m.Screen = CommitDetailScreen
 			m.FileIdx = 0
 			if len(commit.Files) == 0 && m.GitService != nil {
@@ -85,7 +86,7 @@ func (m Model) updateCommitDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case "esc":
-		m.Screen = GraphScreen
+		m.Screen = m.PreviousScreen
 		m.SelectedCommit = types.GraphCommit{}
 		m.FileIdx = 0
 

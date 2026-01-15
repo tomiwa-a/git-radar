@@ -64,6 +64,7 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.GraphCommits[m.GraphIdx].Files = files
 					m.SelectedCommit = m.GraphCommits[m.GraphIdx]
 				}
+				m.PreviousScreen = m.Screen
 				m.Screen = CommitDetailScreen
 				m.FileIdx = 0
 			}

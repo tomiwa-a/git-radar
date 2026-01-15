@@ -20,7 +20,20 @@ func (m Model) View() string {
 	case DiffViewScreen:
 		baseView = screens.RenderDiffs(m.Width, m.SelectedCommit, m.FileIdx, m.Viewport.View())
 	case DivergenceScreen:
-		data := screens.GetDummyDivergenceData()
+		data := screens.DivergenceData{
+			TargetBranch:   m.TargetBranch,
+			SourceBranch:   m.SourceBranch,
+			MergeBase:      nil,
+			Incoming:       m.Incoming,
+			Outgoing:       m.Outgoing,
+			IncomingIdx:    m.IncomingIdx,
+			OutgoingIdx:    m.OutgoingIdx,
+			ActivePane:     int(m.ActivePane),
+			TotalFiles:     0,
+			TotalAdditions: 0,
+			TotalDeletions: 0,
+			ConflictFiles:  nil,
+		}
 		baseView = screens.RenderDivergence(m.Width, m.Height, data)
 	default:
 		baseView = screens.RenderGraph(m.Width, m.GraphCommits, m.GraphIdx, m.CurrentBranch)

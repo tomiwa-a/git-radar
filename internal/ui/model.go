@@ -3,6 +3,7 @@ package ui
 import (
 	"time"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/tomiwa-a/git-radar/internal/git"
@@ -87,6 +88,9 @@ type Model struct {
 	TotalAdditions     int
 	TotalDeletions     int
 	AlertMessage       string
+	ShowFilter         bool
+	FilterInput        textinput.Model
+	FilteredFiles      []types.FileChange
 }
 
 func InitialModel() Model {
@@ -114,11 +118,15 @@ func InitialModel() Model {
 		GraphViewportReady: false,
 		GitService:         nil,
 		LoadingCommits:     false,
+		LoadingDetails:     false,
+		ShowFilter:         false,
+		FilterInput:        textinput.New(),
+		FilteredFiles:      nil,
 	}
 }
 
 func (m Model) Init() tea.Cmd {
-	return nil
+	return textinput.Blink
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

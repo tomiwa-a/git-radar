@@ -66,6 +66,9 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 				m.PreviousScreen = m.Screen
 				m.Screen = CommitDetailScreen
+				m.ShowFilter = false
+				m.FilterInput.SetValue("")
+				m.FilteredFiles = nil
 				m.FileIdx = 0
 			}
 		}

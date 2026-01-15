@@ -16,7 +16,11 @@ func (m Model) View() string {
 		}
 		baseView = screens.RenderGraphWithLegend(m.Width, m.Height, m.GraphCommits, m.GraphIdx, m.CurrentBranch, m.ShowLegend, viewportContent, m.LoadingCommits, m.AlertMessage)
 	case CommitDetailScreen:
-		baseView = screens.RenderFileList(m.Width, m.Height, m.SelectedCommit, m.FileIdx)
+		displayFiles := m.SelectedCommit.Files
+		if m.ShowFilter {
+			displayFiles = m.FilteredFiles
+		}
+		baseView = screens.RenderFileList(m.Width, m.Height, m.SelectedCommit, displayFiles, m.FileIdx, m.ShowFilter, m.FilterInput.Value())
 	case DiffViewScreen:
 		baseView = screens.RenderDiffs(m.Width, m.SelectedCommit, m.FileIdx, m.Viewport.View())
 	case DivergenceScreen:

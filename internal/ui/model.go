@@ -3,6 +3,7 @@ package ui
 import (
 	"time"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/tomiwa-a/git-radar/internal/git"
@@ -48,6 +49,8 @@ type DivergenceLoadedMsg struct {
 	TotalDeletions int
 }
 
+type ClearAlertMsg struct{}
+
 type Model struct {
 	Incoming           []types.GraphCommit
 	Outgoing           []types.GraphCommit
@@ -59,6 +62,7 @@ type Model struct {
 	TargetBranch       string
 	SourceBranch       string
 	Screen             Screen
+	PreviousScreen     Screen
 	SelectedCommit     types.GraphCommit
 	FileIdx            int
 	Viewport           viewport.Model
@@ -83,6 +87,10 @@ type Model struct {
 	TotalFiles         int
 	TotalAdditions     int
 	TotalDeletions     int
+	AlertMessage       string
+	ShowFilter         bool
+	FilterInput        textinput.Model
+	FilteredFiles      []types.FileChange
 }
 
 func InitialModel() Model {
@@ -110,11 +118,15 @@ func InitialModel() Model {
 		GraphViewportReady: false,
 		GitService:         nil,
 		LoadingCommits:     false,
+		LoadingDetails:     false,
+		ShowFilter:         false,
+		FilterInput:        textinput.New(),
+		FilteredFiles:      nil,
 	}
 }
 
 func (m Model) Init() tea.Cmd {
-	return nil
+	return textinput.Blink
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -171,6 +183,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.LoadingDivergence = false
 		m.IncomingIdx = 0
 		m.OutgoingIdx = 0
+		return m, nil
+
+	case ClearAlertMsg:
+		m.AlertMessage = ""
 		return m, nil
 
 	case tea.KeyMsg:
@@ -288,5 +304,11 @@ func (m Model) loadDivergenceCmd(target, source string) tea.Cmd {
 			TotalAdditions: totalAdds,
 			TotalDeletions: totalDels,
 		}
+	})
+}
+
+func clearAlertCmd() tea.Cmd {
+	return tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
+		return ClearAlertMsg{}
 	})
 }

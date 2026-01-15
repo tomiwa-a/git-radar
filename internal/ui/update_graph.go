@@ -4,7 +4,13 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/tomiwa-a/git-radar/internal/ui/screens"
+	"golang.design/x/clipboard"
 )
+
+func copyToClipboard(text string) {
+	clipboard.Init()
+	clipboard.Write(clipboard.FmtText, []byte(text))
+}
 
 const linesPerCommit = 1
 
@@ -58,7 +64,11 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.GraphCommits[m.GraphIdx].Files = files
 					m.SelectedCommit = m.GraphCommits[m.GraphIdx]
 				}
+				m.PreviousScreen = m.Screen
 				m.Screen = CommitDetailScreen
+				m.ShowFilter = false
+				m.FilterInput.SetValue("")
+				m.FilteredFiles = nil
 				m.FileIdx = 0
 			}
 		}
@@ -67,6 +77,14 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !m.ShowLegend {
 			m.ShowCompareModal = true
 			m.CompareModalIdx = 0
+		}
+
+	case "y":
+		if !m.ShowLegend && len(m.GraphCommits) > 0 {
+			hash := m.GraphCommits[m.GraphIdx].FullHash
+			copyToClipboard(hash)
+			m.AlertMessage = "Hash copied!"
+			return m, clearAlertCmd()
 		}
 
 	case "pgup", "pgdown", "home", "end":

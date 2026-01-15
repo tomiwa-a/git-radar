@@ -64,6 +64,7 @@ type DivergenceData struct {
 	TotalDeletions    int
 	ConflictFiles     []string
 	LoadingDivergence bool
+	AlertMessage      string
 }
 
 func GetDummyDivergenceData() DivergenceData {
@@ -108,30 +109,50 @@ func RenderDivergence(width, height int, data DivergenceData) string {
 	if headerGap < 0 {
 		headerGap = 0
 	}
-	b.WriteString(title + strings.Repeat(" ", headerGap) + compareLabel + "\n")
-	b.WriteString(divDimStyle.Render(strings.Repeat("─", width-2)) + "\n\n")
 
 	if data.LoadingDivergence {
+		// Change title to alert message if one exists even during loading
+		if data.AlertMessage != "" {
+			alertStyle := lipgloss.NewStyle().Background(lipgloss.Color("#50FA7B")).Foreground(lipgloss.Color("#282A36")).Bold(true).Padding(0, 1)
+			title = alertStyle.Render(" " + data.AlertMessage + " ")
+		}
+		b.WriteString(title + strings.Repeat(" ", headerGap) + compareLabel + "\n")
+		b.WriteString(divDimStyle.Render(strings.Repeat("─", width-2)) + "\n\n")
+
 		loadingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFB86C")).Bold(true)
 		b.WriteString("\n\n" + loadingStyle.Render("  Loading divergence data...") + "\n\n")
-		help := divDimStyle.Render("esc: back │ q: quit")
+		help := divDimStyle.Render("y: copy hash │ esc: back │ q: quit")
 		b.WriteString(help)
 		return b.String()
 	}
 
+	// Change title to alert message if one exists
+	if data.AlertMessage != "" {
+		alertStyle := lipgloss.NewStyle().Background(lipgloss.Color("#50FA7B")).Foreground(lipgloss.Color("#282A36")).Bold(true).Padding(0, 1)
+		title = alertStyle.Render(" " + data.AlertMessage + " ")
+	}
+
+	b.WriteString(title + strings.Repeat(" ", headerGap) + compareLabel + "\n")
+	b.WriteString(divDimStyle.Render(strings.Repeat("─", width-2)) + "\n\n")
+
 	b.WriteString(renderDivergedAt(width, data.MergeBase))
 	b.WriteString("\n")
 
-	b.WriteString(renderCommitPanes(width, data))
+	b.WriteString(renderCommitPanes(width, height, data))
 	b.WriteString("\n")
 
-	b.WriteString(renderSelectedCommit(width, data))
-	b.WriteString("\n")
+	// Conditionally render details if there's space
+	if height > 25 {
+		b.WriteString(renderSelectedCommit(width, data))
+		b.WriteString("\n")
+	}
 
-	b.WriteString(renderTotalChanges(width, data))
-	b.WriteString("\n")
+	if height > 15 {
+		b.WriteString(renderTotalChanges(width, height, data))
+		b.WriteString("\n")
+	}
 
-	help := divDimStyle.Render("←/→: switch pane │ ↑/↓: navigate │ enter: view diff │ b: change source │ c: change target │ esc: back │ q: quit")
+	help := divDimStyle.Render("←/→: pane │ ↑/↓: nav │ enter: diff │ y: copy │ b: src │ c: target │ esc: back │ q: quit")
 	b.WriteString(help)
 
 	return b.String()
@@ -151,19 +172,31 @@ func renderDivergedAt(width int, mergeBase *types.GraphCommit) string {
 	return divBorderStyle.Width(width-4).Render(content.String()) + "\n"
 }
 
-func renderCommitPanes(width int, data DivergenceData) string {
+func renderCommitPanes(width, height int, data DivergenceData) string {
 	paneWidth := (width - 6) / 2
 	if paneWidth < 30 {
 		paneWidth = 30
 	}
 
-	leftContent := renderCommitPane("⬇ INCOMING", data.Incoming, data.IncomingIdx, data.ActivePane == 0, paneWidth, true)
-	rightContent := renderCommitPane("⬆ OUTGOING", data.Outgoing, data.OutgoingIdx, data.ActivePane == 1, paneWidth, false)
+	// Calculate available height for panes
+	// Diverged At (~4) + Selected Commit (~8-12) + Total Changes (~6) + Help (1) + Spacing/Headers (~10)
+	// This is a rough estimate, let's try to give it as much as possible but cap it
+	reservedHeight := 25
+	availableHeight := height - reservedHeight
+	if availableHeight < 5 {
+		availableHeight = 5
+	}
+	if availableHeight > 10 {
+		availableHeight = 10 // Let's keep a reasonable cap to avoid overwhelming
+	}
+
+	leftContent := renderCommitPane("⬇ INCOMING", data.Incoming, data.IncomingIdx, data.ActivePane == 0, paneWidth, availableHeight, true)
+	rightContent := renderCommitPane("⬆ OUTGOING", data.Outgoing, data.OutgoingIdx, data.ActivePane == 1, paneWidth, availableHeight, false)
 
 	return lipgloss.JoinHorizontal(lipgloss.Top, leftContent, "  ", rightContent)
 }
 
-func renderCommitPane(title string, commits []types.GraphCommit, selectedIdx int, isActive bool, width int, isIncoming bool) string {
+func renderCommitPane(title string, commits []types.GraphCommit, selectedIdx int, isActive bool, width, height int, isIncoming bool) string {
 	var b strings.Builder
 
 	var titleStyle lipgloss.Style
@@ -175,7 +208,11 @@ func renderCommitPane(title string, commits []types.GraphCommit, selectedIdx int
 
 	b.WriteString(" " + titleStyle.Render(fmt.Sprintf("%s (%d commits)", title, len(commits))) + "\n\n")
 
-	maxVisible := 5
+	maxVisible := height - 4 // Title (2) + Borders (2)
+	if maxVisible < 1 {
+		maxVisible = 1
+	}
+
 	startIdx := 0
 	if selectedIdx >= maxVisible {
 		startIdx = selectedIdx - maxVisible + 1
@@ -200,7 +237,7 @@ func renderCommitPane(title string, commits []types.GraphCommit, selectedIdx int
 		}
 
 		msg := commit.Message
-		maxMsgLen := width - 20
+		maxMsgLen := width - 15
 		if maxMsgLen < 10 {
 			maxMsgLen = 10
 		}
@@ -287,7 +324,7 @@ func renderSelectedCommit(width int, data DivergenceData) string {
 	return divBorderStyle.Width(width-4).Render(b.String()) + "\n"
 }
 
-func renderTotalChanges(width int, data DivergenceData) string {
+func renderTotalChanges(width, height int, data DivergenceData) string {
 	var b strings.Builder
 	b.WriteString(" " + divSectionTitleStyle.Render(fmt.Sprintf("TOTAL CHANGES (%s → %s)", data.SourceBranch, data.TargetBranch)) + "\n\n")
 
@@ -297,7 +334,16 @@ func renderTotalChanges(width int, data DivergenceData) string {
 
 	if len(data.ConflictFiles) > 0 {
 		b.WriteString(" " + divWarningStyle.Render(fmt.Sprintf("⚠ Potential conflicts: %d files modified in both branches", len(data.ConflictFiles))) + "\n")
-		for _, f := range data.ConflictFiles {
+		// Cap conflict files to 2 if height is tight, otherwise more
+		maxConflicts := 3
+		if height < 30 {
+			maxConflicts = 1
+		}
+		for i, f := range data.ConflictFiles {
+			if i >= maxConflicts {
+				b.WriteString("   " + divDimStyle.Render(fmt.Sprintf("• and %d more...", len(data.ConflictFiles)-i)) + "\n")
+				break
+			}
 			b.WriteString("   " + divDimStyle.Render("• "+f) + "\n")
 		}
 	} else {

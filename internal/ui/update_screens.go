@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/tomiwa-a/git-radar/internal/types"
@@ -52,12 +54,29 @@ func (m Model) updateDivergence(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if commit.Hash != "" {
 			m.SelectedCommit = commit
+			m.PreviousScreen = m.Screen
 			m.Screen = CommitDetailScreen
+			m.ShowFilter = false
+			m.FilterInput.SetValue("")
+			m.FilteredFiles = nil
 			m.FileIdx = 0
 			if len(commit.Files) == 0 && m.GitService != nil {
 				m.LoadingDetails = true
 				return m, m.loadDetailsCmd(commit.FullHash)
 			}
+		}
+
+	case "y":
+		var hash string
+		if m.ActivePane == IncomingPane && len(m.Incoming) > 0 {
+			hash = m.Incoming[m.IncomingIdx].FullHash
+		} else if m.ActivePane == OutgoingPane && len(m.Outgoing) > 0 {
+			hash = m.Outgoing[m.OutgoingIdx].FullHash
+		}
+		if hash != "" {
+			copyToClipboard(hash)
+			m.AlertMessage = "Hash copied!"
+			return m, clearAlertCmd()
 		}
 
 	case "esc":
@@ -67,14 +86,99 @@ func (m Model) updateDivergence(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateCommitDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.ShowFilter {
+		switch msg.String() {
+		case "esc":
+			m.ShowFilter = false
+			m.FilterInput.SetValue("")
+			m.FilteredFiles = nil
+			m.FileIdx = 0
+			return m, nil
+		case "/":
+			m.ShowFilter = false
+			return m, nil
+		case "up":
+			if m.FileIdx > 0 {
+				m.FileIdx--
+			}
+			return m, nil
+		case "down":
+			if len(m.FilteredFiles) > 0 && m.FileIdx < len(m.FilteredFiles)-1 {
+				m.FileIdx++
+			}
+			return m, nil
+		case "enter":
+			if len(m.FilteredFiles) > 0 {
+				m.Screen = DiffViewScreen
+				m = m.initViewport()
+			}
+			return m, nil
+		}
+
+		var cmd tea.Cmd
+		m.FilterInput, cmd = m.FilterInput.Update(msg)
+
+		// Update filtering
+		query := strings.ToLower(m.FilterInput.Value())
+		if query == "" {
+			m.FilteredFiles = m.SelectedCommit.Files
+		} else {
+			var filtered []types.FileChange
+			isExtSearch := strings.HasPrefix(query, ".") && len(query) > 1
+			extQuery := ""
+			if isExtSearch {
+				extQuery = query[1:]
+			}
+
+			for _, f := range m.SelectedCommit.Files {
+				path := strings.ToLower(f.Path)
+				if isExtSearch {
+					// Extract extension
+					lastDot := strings.LastIndex(path, ".")
+					if lastDot != -1 && lastDot < len(path)-1 {
+						fileExt := path[lastDot+1:]
+						if strings.HasPrefix(fileExt, extQuery) {
+							filtered = append(filtered, f)
+						}
+					}
+				} else {
+					if strings.Contains(path, query) {
+						filtered = append(filtered, f)
+					}
+				}
+			}
+			m.FilteredFiles = filtered
+		}
+
+		// Ensure FileIdx is valid
+		if m.FileIdx >= len(m.FilteredFiles) {
+			m.FileIdx = 0
+			if len(m.FilteredFiles) > 0 {
+				m.FileIdx = len(m.FilteredFiles) - 1
+			}
+		}
+		if len(m.FilteredFiles) == 0 {
+			m.FileIdx = 0
+		}
+
+		return m, cmd
+	}
+
 	switch msg.String() {
 	case "q":
 		return m, tea.Quit
 
 	case "esc":
-		m.Screen = GraphScreen
+		m.Screen = m.PreviousScreen
 		m.SelectedCommit = types.GraphCommit{}
 		m.FileIdx = 0
+
+	case "/":
+		m.ShowFilter = true
+		m.FilterInput.Focus()
+		m.FilteredFiles = m.SelectedCommit.Files
+		m.FileIdx = 0
+		return m, nil
 
 	case "up", "k":
 		if m.FileIdx > 0 {
@@ -113,7 +217,11 @@ func (m Model) updateDiffs(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "right", "l":
-		if m.FileIdx < len(m.SelectedCommit.Files)-1 {
+		displayFiles := m.SelectedCommit.Files
+		if m.ShowFilter {
+			displayFiles = m.FilteredFiles
+		}
+		if m.FileIdx < len(displayFiles)-1 {
 			m.FileIdx++
 			m = m.initViewport()
 		}
@@ -131,7 +239,11 @@ func (m Model) initViewport() Model {
 	m.Viewport = viewport.New(m.Width, m.Height-headerHeight)
 	m.Viewport.YPosition = headerHeight
 
-	file := m.SelectedCommit.Files[m.FileIdx]
+	displayFiles := m.SelectedCommit.Files
+	if m.ShowFilter {
+		displayFiles = m.FilteredFiles
+	}
+	file := displayFiles[m.FileIdx]
 
 	var content string
 	if m.GitService != nil {

@@ -176,12 +176,21 @@ func renderCommitPane(title string, commits []types.GraphCommit, selectedIdx int
 	b.WriteString(" " + titleStyle.Render(fmt.Sprintf("%s (%d commits)", title, len(commits))) + "\n\n")
 
 	maxVisible := 5
-	for i, commit := range commits {
-		if i >= maxVisible {
-			b.WriteString(divDimStyle.Render(fmt.Sprintf("  ... and %d more", len(commits)-maxVisible)) + "\n")
-			break
-		}
+	startIdx := 0
+	if selectedIdx >= maxVisible {
+		startIdx = selectedIdx - maxVisible + 1
+	}
+	endIdx := startIdx + maxVisible
+	if endIdx > len(commits) {
+		endIdx = len(commits)
+	}
 
+	if startIdx > 0 {
+		b.WriteString(divDimStyle.Render(fmt.Sprintf("  ↑ %d more above", startIdx)) + "\n")
+	}
+
+	for i := startIdx; i < endIdx; i++ {
+		commit := commits[i]
 		dot := "○"
 		if commit.IsMerge {
 			dot = "◆"
@@ -191,7 +200,10 @@ func renderCommitPane(title string, commits []types.GraphCommit, selectedIdx int
 		}
 
 		msg := commit.Message
-		maxMsgLen := width - 15
+		maxMsgLen := width - 20
+		if maxMsgLen < 10 {
+			maxMsgLen = 10
+		}
 		if len(msg) > maxMsgLen {
 			msg = msg[:maxMsgLen-3] + "..."
 		}
@@ -205,7 +217,18 @@ func renderCommitPane(title string, commits []types.GraphCommit, selectedIdx int
 		b.WriteString(line + "\n")
 	}
 
-	for i := len(commits); i < maxVisible; i++ {
+	if endIdx < len(commits) {
+		b.WriteString(divDimStyle.Render(fmt.Sprintf("  ↓ %d more below", len(commits)-endIdx)) + "\n")
+	}
+
+	linesRendered := endIdx - startIdx
+	if startIdx > 0 {
+		linesRendered++
+	}
+	if endIdx < len(commits) {
+		linesRendered++
+	}
+	for i := linesRendered; i < maxVisible+2; i++ {
 		b.WriteString("\n")
 	}
 

@@ -17,6 +17,13 @@ const (
 	OutgoingPane
 )
 
+type ComparePane int
+
+const (
+	LocalComparePane ComparePane = iota
+	RemoteComparePane
+)
+
 type Screen int
 
 const (
@@ -91,6 +98,14 @@ type Model struct {
 	ShowFilter         bool
 	FilterInput        textinput.Model
 	FilteredFiles      []types.FileChange
+	CompareLocalPane   viewport.Model
+	CompareRemotePane  viewport.Model
+	ActiveComparePane  ComparePane
+	LocalBranches      []types.Branch
+	RemoteBranches     []types.Branch
+	CompareFilterInput textinput.Model
+	FilteredLocal      []types.Branch
+	FilteredRemote     []types.Branch
 }
 
 func InitialModel() Model {
@@ -122,6 +137,8 @@ func InitialModel() Model {
 		ShowFilter:         false,
 		FilterInput:        textinput.New(),
 		FilteredFiles:      nil,
+		ActiveComparePane:  LocalComparePane,
+		CompareFilterInput: textinput.New(),
 	}
 }
 

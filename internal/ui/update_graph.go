@@ -77,6 +77,28 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !m.ShowLegend {
 			m.ShowCompareModal = true
 			m.CompareModalIdx = 0
+			m.ActiveComparePane = LocalComparePane
+			m.CompareFilterInput.SetValue("")
+			m.CompareFilterInput.Focus()
+
+			// Split branches
+			m.LocalBranches = nil
+			m.RemoteBranches = nil
+			for _, b := range m.Branches {
+				if b.Name == m.CurrentBranch {
+					continue
+				}
+				if b.IsRemote {
+					m.RemoteBranches = append(m.RemoteBranches, b)
+				} else {
+					m.LocalBranches = append(m.LocalBranches, b)
+				}
+			}
+			m.FilteredLocal = m.LocalBranches
+			m.FilteredRemote = m.RemoteBranches
+
+			// Initialize viewports
+			m = m.initCompareViewports()
 		}
 
 	case "y":
@@ -137,6 +159,58 @@ func (m Model) updateGraphViewportContent() Model {
 		leftPaneWidth := (m.Width * 60) / 100
 		content := screens.RenderGraphContent(leftPaneWidth, m.GraphCommits, m.GraphIdx)
 		m.GraphViewport.SetContent(content)
+	}
+	return m
+}
+
+func (m Model) initCompareViewports() Model {
+	modalWidth := int(float64(m.Width) * 0.8)
+	modalHeight := int(float64(m.Height) * 0.7)
+	paneWidth := (modalWidth - 6) / 2 // Borders and divider
+	paneHeight := modalHeight - 7     // Headers, filter, footer
+
+	m.CompareLocalPane = viewport.New(paneWidth, paneHeight)
+	m.CompareRemotePane = viewport.New(paneWidth, paneHeight)
+
+	return m.updateCompareViewportContent()
+}
+
+func (m Model) updateCompareViewportContent() Model {
+	modalWidth := int(float64(m.Width) * 0.8)
+	paneWidth := (modalWidth - 6) / 2
+
+	m = m.scrollToCompareSelection()
+
+	localContent := screens.RenderBranchListContent(paneWidth, m.FilteredLocal, m.CompareModalIdx, m.ActiveComparePane == LocalComparePane)
+	m.CompareLocalPane.SetContent(localContent)
+
+	remoteContent := screens.RenderBranchListContent(paneWidth, m.FilteredRemote, m.CompareModalIdx, m.ActiveComparePane == RemoteComparePane)
+	m.CompareRemotePane.SetContent(remoteContent)
+
+	return m
+}
+
+func (m Model) scrollToCompareSelection() Model {
+	if m.ActiveComparePane == LocalComparePane {
+		selectedLine := m.CompareModalIdx
+		viewportHeight := m.CompareLocalPane.Height
+		currentTop := m.CompareLocalPane.YOffset
+
+		if selectedLine < currentTop {
+			m.CompareLocalPane.SetYOffset(selectedLine)
+		} else if selectedLine >= currentTop+viewportHeight {
+			m.CompareLocalPane.SetYOffset(selectedLine - viewportHeight + 1)
+		}
+	} else {
+		selectedLine := m.CompareModalIdx
+		viewportHeight := m.CompareRemotePane.Height
+		currentTop := m.CompareRemotePane.YOffset
+
+		if selectedLine < currentTop {
+			m.CompareRemotePane.SetYOffset(selectedLine)
+		} else if selectedLine >= currentTop+viewportHeight {
+			m.CompareRemotePane.SetYOffset(selectedLine - viewportHeight + 1)
+		}
 	}
 	return m
 }

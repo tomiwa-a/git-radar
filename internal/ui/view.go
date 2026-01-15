@@ -55,8 +55,9 @@ func (m Model) View() string {
 	}
 
 	if m.ShowCompareModal {
-		comparableBranches := m.getComparableBranches()
-		modal := screens.RenderCompareModal(m.Width, m.Height, comparableBranches, m.CompareModalIdx, m.CurrentBranch)
+		localView := m.CompareLocalPane.View()
+		remoteView := m.CompareRemotePane.View()
+		modal := screens.RenderCompareModal(m.Width, m.Height, localView, remoteView, m.CompareFilterInput.Value(), int(m.ActiveComparePane))
 		return modal
 	}
 

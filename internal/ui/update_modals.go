@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/tomiwa-a/git-radar/internal/types"
 )
@@ -65,25 +67,56 @@ func (m Model) updateBranchModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateCompareModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	comparableBranches := m.getComparableBranches()
-
 	switch msg.String() {
-	case "esc", "c":
+	case "esc":
 		m.ShowCompareModal = false
+		return m, nil
+
+	case "tab", "right", "l":
+		if m.ActiveComparePane == LocalComparePane {
+			m.ActiveComparePane = RemoteComparePane
+			m.CompareModalIdx = 0
+		} else {
+			m.ActiveComparePane = LocalComparePane
+			m.CompareModalIdx = 0
+		}
+		return m.updateCompareViewportContent(), nil
+
+	case "left", "h":
+		if m.ActiveComparePane == RemoteComparePane {
+			m.ActiveComparePane = LocalComparePane
+			m.CompareModalIdx = 0
+		} else {
+			m.ActiveComparePane = RemoteComparePane
+			m.CompareModalIdx = 0
+		}
+		return m.updateCompareViewportContent(), nil
 
 	case "up", "k":
 		if m.CompareModalIdx > 0 {
 			m.CompareModalIdx--
+			m = m.updateCompareViewportContent()
 		}
+		return m, nil
 
 	case "down", "j":
-		if m.CompareModalIdx < len(comparableBranches)-1 {
-			m.CompareModalIdx++
+		activeList := m.FilteredLocal
+		if m.ActiveComparePane == RemoteComparePane {
+			activeList = m.FilteredRemote
 		}
+		if m.CompareModalIdx < len(activeList)-1 {
+			m.CompareModalIdx++
+			m = m.updateCompareViewportContent()
+		}
+		return m, nil
 
 	case "enter":
-		if len(comparableBranches) > 0 && m.GitService != nil {
-			m.TargetBranch = comparableBranches[m.CompareModalIdx]
+		activeList := m.FilteredLocal
+		if m.ActiveComparePane == RemoteComparePane {
+			activeList = m.FilteredRemote
+		}
+		if len(activeList) > 0 && m.CompareModalIdx < len(activeList) {
+			m.TargetBranch = activeList[m.CompareModalIdx].Name
 			m.SourceBranch = m.CurrentBranch
 			m.ShowCompareModal = false
 			m.Screen = DivergenceScreen
@@ -97,5 +130,35 @@ func (m Model) updateCompareModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.loadDivergenceCmd(m.TargetBranch, m.SourceBranch)
 		}
 	}
-	return m, nil
+
+	var cmd tea.Cmd
+	m.CompareFilterInput, cmd = m.CompareFilterInput.Update(msg)
+
+	// Update filtering
+	query := strings.ToLower(m.CompareFilterInput.Value())
+
+	m.FilteredLocal = nil
+	for _, b := range m.LocalBranches {
+		if strings.Contains(strings.ToLower(b.Name), query) {
+			m.FilteredLocal = append(m.FilteredLocal, b)
+		}
+	}
+
+	m.FilteredRemote = nil
+	for _, b := range m.RemoteBranches {
+		if strings.Contains(strings.ToLower(b.Name), query) {
+			m.FilteredRemote = append(m.FilteredRemote, b)
+		}
+	}
+
+	// Reset index if it's out of bounds
+	activeList := m.FilteredLocal
+	if m.ActiveComparePane == RemoteComparePane {
+		activeList = m.FilteredRemote
+	}
+	if m.CompareModalIdx >= len(activeList) {
+		m.CompareModalIdx = 0
+	}
+
+	return m.updateCompareViewportContent(), cmd
 }

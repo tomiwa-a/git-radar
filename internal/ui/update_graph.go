@@ -41,7 +41,15 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "/":
-		if !m.ShowLegend && !m.ShowGraphSearch {
+		if m.ShowGraphSearch {
+			m.ShowGraphSearch = false
+			m.GraphSearchInput.SetValue("")
+			m.FilteredGraphCommits = nil
+			m.GraphIdx = 0
+			m = m.updateGraphViewportContent()
+			return m, nil
+		}
+		if !m.ShowLegend {
 			m.ShowGraphSearch = true
 			m.GraphSearchInput.Focus()
 			m.GraphSearchInput.SetValue("")
@@ -49,9 +57,29 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-	case "up", "k":
+	case "up":
+		if !m.ShowLegend {
+			commits := m.getDisplayCommits()
+			if m.GraphIdx > 0 {
+				m.GraphIdx--
+				m = m.updateGraphViewportContent()
+				m = m.scrollToGraphSelection()
+				if len(commits) > 0 && m.GraphIdx < len(commits) {
+					m.PendingDetailsHash = commits[m.GraphIdx].FullHash
+					return m, m.debounceDetailsCmd(commits[m.GraphIdx].FullHash)
+				}
+			}
+		}
+		return m, nil
+
+	case "k":
 		if m.ShowGraphSearch {
-			return m, nil
+			var cmd tea.Cmd
+			m.GraphSearchInput, cmd = m.GraphSearchInput.Update(msg)
+			m = m.filterGraphCommits()
+			m.GraphIdx = 0
+			m = m.updateGraphViewportContent()
+			return m, cmd
 		}
 		if !m.ShowLegend {
 			commits := m.getDisplayCommits()
@@ -67,9 +95,29 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case "down", "j":
+	case "down":
+		if !m.ShowLegend {
+			commits := m.getDisplayCommits()
+			if m.GraphIdx < len(commits)-1 {
+				m.GraphIdx++
+				m = m.updateGraphViewportContent()
+				m = m.scrollToGraphSelection()
+				if len(commits) > 0 && m.GraphIdx < len(commits) {
+					m.PendingDetailsHash = commits[m.GraphIdx].FullHash
+					return m, m.debounceDetailsCmd(commits[m.GraphIdx].FullHash)
+				}
+			}
+		}
+		return m, nil
+
+	case "j":
 		if m.ShowGraphSearch {
-			return m, nil
+			var cmd tea.Cmd
+			m.GraphSearchInput, cmd = m.GraphSearchInput.Update(msg)
+			m = m.filterGraphCommits()
+			m.GraphIdx = 0
+			m = m.updateGraphViewportContent()
+			return m, cmd
 		}
 		if !m.ShowLegend {
 			commits := m.getDisplayCommits()
@@ -86,10 +134,6 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "enter":
-		if m.ShowGraphSearch {
-			m.ShowGraphSearch = false
-			return m, nil
-		}
 		if !m.ShowLegend {
 			commits := m.getDisplayCommits()
 			if len(commits) > 0 && m.GraphIdx < len(commits) {
@@ -121,6 +165,14 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "c":
+		if m.ShowGraphSearch {
+			var cmd tea.Cmd
+			m.GraphSearchInput, cmd = m.GraphSearchInput.Update(msg)
+			m = m.filterGraphCommits()
+			m.GraphIdx = 0
+			m = m.updateGraphViewportContent()
+			return m, cmd
+		}
 		if !m.ShowLegend {
 			m.ShowCompareModal = true
 			m.CompareModalIdx = 0
@@ -149,11 +201,22 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "y":
-		if !m.ShowLegend && len(m.GraphCommits) > 0 {
-			hash := m.GraphCommits[m.GraphIdx].FullHash
-			copyToClipboard(hash)
-			m.AlertMessage = "Hash copied!"
-			return m, clearAlertCmd()
+		if m.ShowGraphSearch {
+			var cmd tea.Cmd
+			m.GraphSearchInput, cmd = m.GraphSearchInput.Update(msg)
+			m = m.filterGraphCommits()
+			m.GraphIdx = 0
+			m = m.updateGraphViewportContent()
+			return m, cmd
+		}
+		if !m.ShowLegend {
+			commits := m.getDisplayCommits()
+			if len(commits) > 0 && m.GraphIdx < len(commits) {
+				hash := commits[m.GraphIdx].FullHash
+				copyToClipboard(hash)
+				m.AlertMessage = "Hash copied!"
+				return m, clearAlertCmd()
+			}
 		}
 
 	case "pgup", "pgdown", "home", "end":

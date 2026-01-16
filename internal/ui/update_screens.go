@@ -172,6 +172,9 @@ func (m Model) updateCommitDetail(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.Screen = m.PreviousScreen
 		m.SelectedCommit = types.GraphCommit{}
 		m.FileIdx = 0
+		if m.PreviousScreen == GraphScreen {
+			m = m.updateGraphViewportContent()
+		}
 
 	case "/":
 		m.ShowFilter = true

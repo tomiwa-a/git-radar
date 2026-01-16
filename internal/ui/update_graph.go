@@ -157,9 +157,6 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.FilterInput.SetValue("")
 					m.FilteredFiles = nil
 					m.FileIdx = 0
-					m.ShowGraphSearch = false
-					m.GraphSearchInput.SetValue("")
-					m.FilteredGraphCommits = nil
 				}
 			}
 		}

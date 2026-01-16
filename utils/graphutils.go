@@ -142,6 +142,7 @@ func RenderLegend(width, height int, selectedDotStyle, mergeDotStyle, branchCoun
 	content.WriteString("\n" + sectionStyle.Render("KEYS") + "\n")
 	content.WriteString(itemStyle.Render("  ↑/↓ j/k") + descStyle.Render("   Navigate commits") + "\n")
 	content.WriteString(itemStyle.Render("  enter") + descStyle.Render("     View commit files") + "\n")
+	content.WriteString(itemStyle.Render("  /") + descStyle.Render("         Search commits") + "\n")
 	content.WriteString(itemStyle.Render("  b") + descStyle.Render("         Switch branch") + "\n")
 	content.WriteString(itemStyle.Render("  c") + descStyle.Render("         Compare branches") + "\n")
 	content.WriteString(itemStyle.Render("  q") + descStyle.Render("         Quit") + "\n")

@@ -28,10 +28,10 @@ var (
 )
 
 func RenderGraph(width int, commits []types.GraphCommit, selectedIdx int, currentBranch string, alertMessage string) string {
-	return RenderGraphWithLegend(width, 24, commits, selectedIdx, currentBranch, false, "", false, alertMessage)
+	return RenderGraphWithLegend(width, 24, commits, selectedIdx, currentBranch, false, "", false, alertMessage, false, "")
 }
 
-func RenderGraphWithLegend(width, height int, commits []types.GraphCommit, selectedIdx int, currentBranch string, showLegend bool, viewportContent string, loading bool, alertMessage string) string {
+func RenderGraphWithLegend(width, height int, commits []types.GraphCommit, selectedIdx int, currentBranch string, showLegend bool, viewportContent string, loading bool, alertMessage string, showSearch bool, searchQuery string) string {
 	if showLegend {
 		return utils.RenderLegend(
 			width, height,
@@ -76,6 +76,13 @@ func RenderGraphWithLegend(width, height int, commits []types.GraphCommit, selec
 	divider := paneBorderStyle.Render(strings.Repeat("─", leftPaneWidth) + "┼" + strings.Repeat("─", rightPaneWidth+1))
 	b.WriteString(divider + "\n")
 
+	if showSearch {
+		searchStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#F8F8F2")).Background(lipgloss.Color("#44475A")).Padding(0, 1)
+		searchLabel := utils.DetailsLabelStyle.Render(" / ")
+		searchBox := searchStyle.Render(searchQuery + "█")
+		b.WriteString(searchLabel + searchBox + "\n")
+	}
+
 	// Get selected commit for details panel
 	var selectedCommit *types.GraphCommit
 	if selectedIdx >= 0 && selectedIdx < len(commits) {
@@ -116,7 +123,7 @@ func RenderGraphWithLegend(width, height int, commits []types.GraphCommit, selec
 	}
 
 	// Footer
-	footer := utils.DetailsLabelStyle.Render("↑/↓: navigate │ enter: view files │ y: copy hash │ b: branches │ c: compare │ ?: help │ q: quit")
+	footer := utils.DetailsLabelStyle.Render("↑/↓: navigate │ enter: view files │ /: search │ y: copy hash │ b: branches │ c: compare │ ?: help │ q: quit")
 	b.WriteString(footer)
 
 	return b.String()

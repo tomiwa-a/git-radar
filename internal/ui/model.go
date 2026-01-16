@@ -120,6 +120,9 @@ type Model struct {
 	BranchFilterInput    textinput.Model
 	BranchFilteredLocal  []types.Branch
 	BranchFilteredRemote []types.Branch
+	ShowGraphSearch      bool
+	GraphSearchInput     textinput.Model
+	FilteredGraphCommits []types.GraphCommit
 }
 
 func InitialModel(repoPath string) Model {
@@ -156,6 +159,8 @@ func InitialModel(repoPath string) Model {
 		ActiveComparePane:  LocalComparePane,
 		CompareFilterInput: textinput.New(),
 		BranchFilterInput:  textinput.New(),
+		ShowGraphSearch:    false,
+		GraphSearchInput:   textinput.New(),
 	}
 }
 

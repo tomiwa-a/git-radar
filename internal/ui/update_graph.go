@@ -1,8 +1,11 @@
 package ui
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/tomiwa-a/git-radar/internal/types"
 	"github.com/tomiwa-a/git-radar/internal/ui/screens"
 	"golang.design/x/clipboard"
 )
@@ -24,56 +27,149 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "esc":
+		if m.ShowGraphSearch {
+			m.ShowGraphSearch = false
+			m.GraphSearchInput.SetValue("")
+			m.FilteredGraphCommits = nil
+			m.GraphIdx = 0
+			m = m.updateGraphViewportContent()
+			return m, nil
+		}
 		if m.ShowLegend {
 			m.ShowLegend = false
 			return m, nil
 		}
 
-	case "up", "k":
-		if !m.ShowLegend && m.GraphIdx > 0 {
-			m.GraphIdx--
+	case "/":
+		if m.ShowGraphSearch {
+			m.ShowGraphSearch = false
+			m.GraphSearchInput.SetValue("")
+			m.FilteredGraphCommits = nil
+			m.GraphIdx = 0
 			m = m.updateGraphViewportContent()
-			m = m.scrollToGraphSelection()
-			if len(m.GraphCommits) > 0 {
-				m.PendingDetailsHash = m.GraphCommits[m.GraphIdx].FullHash
-				return m, m.debounceDetailsCmd(m.GraphCommits[m.GraphIdx].FullHash)
+			return m, nil
+		}
+		if !m.ShowLegend {
+			m.ShowGraphSearch = true
+			m.GraphSearchInput.Focus()
+			m.GraphSearchInput.SetValue("")
+			m.FilteredGraphCommits = nil
+			return m, nil
+		}
+
+	case "up":
+		if !m.ShowLegend {
+			commits := m.getDisplayCommits()
+			if m.GraphIdx > 0 {
+				m.GraphIdx--
+				m = m.updateGraphViewportContent()
+				m = m.scrollToGraphSelection()
+				if len(commits) > 0 && m.GraphIdx < len(commits) {
+					m.PendingDetailsHash = commits[m.GraphIdx].FullHash
+					return m, m.debounceDetailsCmd(commits[m.GraphIdx].FullHash)
+				}
 			}
 		}
 		return m, nil
 
-	case "down", "j":
-		if !m.ShowLegend && m.GraphIdx < len(m.GraphCommits)-1 {
-			m.GraphIdx++
+	case "k":
+		if m.ShowGraphSearch {
+			var cmd tea.Cmd
+			m.GraphSearchInput, cmd = m.GraphSearchInput.Update(msg)
+			m = m.filterGraphCommits()
+			m.GraphIdx = 0
 			m = m.updateGraphViewportContent()
-			m = m.scrollToGraphSelection()
-			if len(m.GraphCommits) > 0 {
-				m.PendingDetailsHash = m.GraphCommits[m.GraphIdx].FullHash
-				return m, m.debounceDetailsCmd(m.GraphCommits[m.GraphIdx].FullHash)
+			return m, cmd
+		}
+		if !m.ShowLegend {
+			commits := m.getDisplayCommits()
+			if m.GraphIdx > 0 {
+				m.GraphIdx--
+				m = m.updateGraphViewportContent()
+				m = m.scrollToGraphSelection()
+				if len(commits) > 0 && m.GraphIdx < len(commits) {
+					m.PendingDetailsHash = commits[m.GraphIdx].FullHash
+					return m, m.debounceDetailsCmd(commits[m.GraphIdx].FullHash)
+				}
+			}
+		}
+		return m, nil
+
+	case "down":
+		if !m.ShowLegend {
+			commits := m.getDisplayCommits()
+			if m.GraphIdx < len(commits)-1 {
+				m.GraphIdx++
+				m = m.updateGraphViewportContent()
+				m = m.scrollToGraphSelection()
+				if len(commits) > 0 && m.GraphIdx < len(commits) {
+					m.PendingDetailsHash = commits[m.GraphIdx].FullHash
+					return m, m.debounceDetailsCmd(commits[m.GraphIdx].FullHash)
+				}
+			}
+		}
+		return m, nil
+
+	case "j":
+		if m.ShowGraphSearch {
+			var cmd tea.Cmd
+			m.GraphSearchInput, cmd = m.GraphSearchInput.Update(msg)
+			m = m.filterGraphCommits()
+			m.GraphIdx = 0
+			m = m.updateGraphViewportContent()
+			return m, cmd
+		}
+		if !m.ShowLegend {
+			commits := m.getDisplayCommits()
+			if m.GraphIdx < len(commits)-1 {
+				m.GraphIdx++
+				m = m.updateGraphViewportContent()
+				m = m.scrollToGraphSelection()
+				if len(commits) > 0 && m.GraphIdx < len(commits) {
+					m.PendingDetailsHash = commits[m.GraphIdx].FullHash
+					return m, m.debounceDetailsCmd(commits[m.GraphIdx].FullHash)
+				}
 			}
 		}
 		return m, nil
 
 	case "enter":
-		if !m.ShowLegend && len(m.GraphCommits) > 0 {
-			gc := m.GraphCommits[m.GraphIdx]
-			m.SelectedCommit = gc
-			if m.SelectedCommit.Hash != "" {
-				if len(gc.Files) == 0 && m.GitService != nil {
-					parentInfos, files, _ := m.GitService.GetCommitDetails(gc.FullHash)
-					m.GraphCommits[m.GraphIdx].ParentInfos = parentInfos
-					m.GraphCommits[m.GraphIdx].Files = files
-					m.SelectedCommit = m.GraphCommits[m.GraphIdx]
+		if !m.ShowLegend {
+			commits := m.getDisplayCommits()
+			if len(commits) > 0 && m.GraphIdx < len(commits) {
+				gc := commits[m.GraphIdx]
+				m.SelectedCommit = gc
+				if m.SelectedCommit.Hash != "" {
+					if len(gc.Files) == 0 && m.GitService != nil {
+						parentInfos, files, _ := m.GitService.GetCommitDetails(gc.FullHash)
+						for i := range m.GraphCommits {
+							if m.GraphCommits[i].FullHash == gc.FullHash {
+								m.GraphCommits[i].ParentInfos = parentInfos
+								m.GraphCommits[i].Files = files
+								m.SelectedCommit = m.GraphCommits[i]
+								break
+							}
+						}
+					}
+					m.PreviousScreen = m.Screen
+					m.Screen = CommitDetailScreen
+					m.ShowFilter = false
+					m.FilterInput.SetValue("")
+					m.FilteredFiles = nil
+					m.FileIdx = 0
 				}
-				m.PreviousScreen = m.Screen
-				m.Screen = CommitDetailScreen
-				m.ShowFilter = false
-				m.FilterInput.SetValue("")
-				m.FilteredFiles = nil
-				m.FileIdx = 0
 			}
 		}
 
 	case "c":
+		if m.ShowGraphSearch {
+			var cmd tea.Cmd
+			m.GraphSearchInput, cmd = m.GraphSearchInput.Update(msg)
+			m = m.filterGraphCommits()
+			m.GraphIdx = 0
+			m = m.updateGraphViewportContent()
+			return m, cmd
+		}
 		if !m.ShowLegend {
 			m.ShowCompareModal = true
 			m.CompareModalIdx = 0
@@ -102,21 +198,71 @@ func (m Model) updateGraph(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "y":
-		if !m.ShowLegend && len(m.GraphCommits) > 0 {
-			hash := m.GraphCommits[m.GraphIdx].FullHash
-			copyToClipboard(hash)
-			m.AlertMessage = "Hash copied!"
-			return m, clearAlertCmd()
+		if m.ShowGraphSearch {
+			var cmd tea.Cmd
+			m.GraphSearchInput, cmd = m.GraphSearchInput.Update(msg)
+			m = m.filterGraphCommits()
+			m.GraphIdx = 0
+			m = m.updateGraphViewportContent()
+			return m, cmd
+		}
+		if !m.ShowLegend {
+			commits := m.getDisplayCommits()
+			if len(commits) > 0 && m.GraphIdx < len(commits) {
+				hash := commits[m.GraphIdx].FullHash
+				copyToClipboard(hash)
+				m.AlertMessage = "Hash copied!"
+				return m, clearAlertCmd()
+			}
 		}
 
 	case "pgup", "pgdown", "home", "end":
-		if !m.ShowLegend && m.GraphViewportReady {
+		if !m.ShowLegend && !m.ShowGraphSearch && m.GraphViewportReady {
 			var cmd tea.Cmd
 			m.GraphViewport, cmd = m.GraphViewport.Update(msg)
 			return m, cmd
 		}
+
+	default:
+		if m.ShowGraphSearch {
+			var cmd tea.Cmd
+			m.GraphSearchInput, cmd = m.GraphSearchInput.Update(msg)
+			m = m.filterGraphCommits()
+			m.GraphIdx = 0
+			m = m.updateGraphViewportContent()
+			return m, cmd
+		}
 	}
 	return m, nil
+}
+
+func (m Model) getDisplayCommits() []types.GraphCommit {
+	if m.ShowGraphSearch && len(m.FilteredGraphCommits) > 0 {
+		return m.FilteredGraphCommits
+	}
+	if m.ShowGraphSearch && m.GraphSearchInput.Value() != "" {
+		return m.FilteredGraphCommits
+	}
+	return m.GraphCommits
+}
+
+func (m Model) filterGraphCommits() Model {
+	query := strings.ToLower(m.GraphSearchInput.Value())
+	if query == "" {
+		m.FilteredGraphCommits = nil
+		return m
+	}
+
+	var filtered []types.GraphCommit
+	for _, c := range m.GraphCommits {
+		if strings.Contains(strings.ToLower(c.Message), query) ||
+			strings.Contains(strings.ToLower(c.Hash), query) ||
+			strings.Contains(strings.ToLower(c.Author), query) {
+			filtered = append(filtered, c)
+		}
+	}
+	m.FilteredGraphCommits = filtered
+	return m
 }
 
 func (m Model) scrollToGraphSelection() Model {
@@ -142,12 +288,16 @@ func (m Model) scrollToGraphSelection() Model {
 func (m Model) initGraphViewport() Model {
 	headerHeight := 4
 	footerHeight := 1
+	if m.ShowGraphSearch {
+		headerHeight = 5
+	}
 	leftPaneWidth := (m.Width * 60) / 100
 
 	m.GraphViewport = viewport.New(leftPaneWidth, m.Height-headerHeight-footerHeight)
 	m.GraphViewport.YPosition = headerHeight
 
-	content := screens.RenderGraphContent(leftPaneWidth, m.GraphCommits, m.GraphIdx)
+	commits := m.getDisplayCommits()
+	content := screens.RenderGraphContent(leftPaneWidth, commits, m.GraphIdx)
 	m.GraphViewport.SetContent(content)
 	m.GraphViewportReady = true
 
@@ -157,7 +307,8 @@ func (m Model) initGraphViewport() Model {
 func (m Model) updateGraphViewportContent() Model {
 	if m.GraphViewportReady {
 		leftPaneWidth := (m.Width * 60) / 100
-		content := screens.RenderGraphContent(leftPaneWidth, m.GraphCommits, m.GraphIdx)
+		commits := m.getDisplayCommits()
+		content := screens.RenderGraphContent(leftPaneWidth, commits, m.GraphIdx)
 		m.GraphViewport.SetContent(content)
 	}
 	return m
